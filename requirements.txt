@@ -1,0 +1,4 @@
+panel>=1.4
+opencv-python>=4.10
+numpy>=1.26
+Pillow>=10.3

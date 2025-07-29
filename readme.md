@@ -28,3 +28,19 @@ panel/
 ```bash
 panel serve main.py --show
 ```
+
+## Environment Setup with uv
+
+```bash
+# Install uv (if not already installed)
+curl -Ls https://astral.sh/uv/install.sh | sh
+
+# Create a virtual environment inside the project
+uv venv .venv
+
+# Activate the environment (Linux/macOS)
+source .venv/bin/activate
+
+# Install required packages
+uv pip install -r requirements.txt
+```
