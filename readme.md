@@ -16,6 +16,7 @@ panel/
 │   └── synthetic_tab.py
 ├── experiments/
 ├── main.py
+├── requirements.txt
 └── readme.md
 ```
 
