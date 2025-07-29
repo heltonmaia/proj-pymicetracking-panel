@@ -6,8 +6,6 @@
 panel/
 ├── camera_tab/
 │   └── camera_tab.py
-├── playback_tab/
-│   └── playback_tab.py
 ├── tracking_tab/
 │   └── tracking_tab.py
 ├── ethological_tab/
