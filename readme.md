@@ -1,8 +1,8 @@
-# Projeto Modularizado com Panel
+# Modularized Project with Panel
 
-## Estrutura de Pastas
+## Folder Structure
 
-```
+```text
 panel/
 ├── camera_tab/
 │   └── camera_tab.py
@@ -21,12 +21,12 @@ panel/
 └── readme.md
 ```
 
-- Cada pasta de tab contém a lógica, funções e layout de sua respectiva aba.
-- O diretório `experiments/` é utilizado por todas as abas para leitura e gravação de arquivos.
-- O `main.py` gerencia a interface geral e importa cada aba como um mini-projeto.
+- Each tab folder contains the logic, functions, and layout for its corresponding panel tab.
+- The `experiments/` directory is a shared location used by all tabs for reading and writing files.
+- `main.py` manages the overall interface and imports each tab as a mini-module.
 
-## Como rodar
+## How to Run
 
 ```bash
-panel serve main.py --show --autoreload
+panel serve main.py --show
 ```

@@ -22,7 +22,7 @@ class CameraTab:
 
         # Frame display
         self.frame_pane = pn.pane.HTML(
-            "<div style='width:640px; height:480px; border:2px solid #ccc; display:flex; align-items:center; justify-content:center; background:#f0f0f0; font-size:18px; color:#666;'>📹 Webcam parada</div>",
+            "<div style='width:640px; height:480px; border:2px solid #ccc; display:flex; align-items:center; justify-content:center; background:#f0f0f0; font-size:18px; color:#666;'>📹 Webcam off</div>",
             width=644,
             height=484
         )
@@ -60,7 +60,7 @@ class CameraTab:
         self.camera_info_text = pn.pane.Markdown("**Camera Info:** -")
         self.camera_select = pn.widgets.Select(name='📷 Camera:', options=self._get_available_cameras(), width=200)
         self.resolution_select = pn.widgets.Select(
-            name='📐 Resolução:',
+            name='📐 Resolution:',
             options={
                 '640x480': (640, 480),
                 '800x600': (800, 600),
@@ -70,7 +70,7 @@ class CameraTab:
             value=(640, 480), width=150
         )
         self.output_dir = pn.widgets.TextInput(
-            name='📁 Pasta de gravação:', 
+            name='📁 Output folder:', 
             value=EXPERIMENTS_DIR, 
             width=350
         )
@@ -106,14 +106,14 @@ class CameraTab:
                 self.status_text.object = f"**Status:** ❌ Error opening camera {camera_index}."
                 self.camera = None
                 return
-            # Aplicar resolução escolhida
+            # Apply selected resolution
             width_sel, height_sel = self.resolution_select.value
             self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, width_sel)
             self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, height_sel)
             self.camera.set(cv2.CAP_PROP_FPS, 20)
             self.streaming = True
 
-            # Atualizar informações da câmera
+            # Update camera info
             width = int(self.camera.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(self.camera.get(cv2.CAP_PROP_FRAME_HEIGHT))
             fps_cap = self.camera.get(cv2.CAP_PROP_FPS)
@@ -157,19 +157,19 @@ class CameraTab:
             return
         self.recording = True
         
-        # Verificar/criar pasta de saída
+        # Ensure output folder exists
         output_folder = self.output_dir.value
         if not os.path.exists(output_folder):
             try:
                 os.makedirs(output_folder)
-                self.debug_text.object = f"**Debug:** Pasta criada: {output_folder}"
+                self.debug_text.object = f"**Debug:** Folder created: {output_folder}"
             except Exception as e:
-                self.debug_text.object = f"**Debug:** ❌ Erro ao criar pasta: {e}"
+                self.debug_text.object = f"**Debug:** ❌ Error creating folder: {e}"
                 self.recording = False
                 return
         
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        # Dimensionar vídeo conforme resolução atual da câmera
+        # Scale video to current camera resolution
         width_cap = int(self.camera.get(cv2.CAP_PROP_FRAME_WIDTH))
         height_cap = int(self.camera.get(cv2.CAP_PROP_FRAME_HEIGHT))
         self.temp_video_file = os.path.join(output_folder, f"temp_video_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4")
@@ -196,10 +196,10 @@ class CameraTab:
             final_filepath = os.path.join(output_folder, final_filename)
             try:
                 os.rename(self.temp_video_file, final_filepath)
-                self.debug_text.object = f"**Debug:** ✅ Vídeo salvo em {final_filepath}"
+                self.debug_text.object = f"**Debug:** ✅ Video saved to {final_filepath}"
             except Exception as e:
-                self.debug_text.object = f"**Debug:** ❌ Erro ao salvar vídeo: {e}"
-        self.recording_text.object = "**Gravação:** ⚪ Parada"
+                self.debug_text.object = f"**Debug:** ❌ Error saving video: {e}"
+        self.recording_text.object = "**Recording:** ⚪ Stopped"
         self.record_button.disabled = False
         self.stop_record_button.disabled = True
 
