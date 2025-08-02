@@ -66,7 +66,7 @@ class TrackingTab:
         self._buttons()
     
         # frame display
-        self.frame_pane = figure(width=640, height=480, tools="reset", x_range=(0, 640), y_range=(0,480))
+        self.frame_pane = figure(width=640, height=640, tools="reset", x_range=(0, 640), y_range=(0,640))
         self.frame_pane.margin=0
         self.frame_pane.border_fill_color = "#808080"
         self.frame_pane.outline_line_color = None
@@ -176,7 +176,6 @@ class TrackingTab:
         self.bounding_box.right = max(self.start_bounding_box['x'], event.x)
         self.bounding_box.top = min(self.start_bounding_box['y'], event.y)
         self.bounding_box.bottom = max(self.start_bounding_box['y'], event.y)
-        
    
     def _bb_pan_end(self, event):
         
@@ -189,21 +188,17 @@ class TrackingTab:
         self.button_clear_roi.disabled = False
         self.button_start_tracking.disabled = False
     
-    def _clear_roi(self, event):  
-        print(self.frame_pane.renderers)
-        
-        # for i in self.rois:
-            # self.frame_pane._property_values["layout"].remove(i)
-
-            # self.frame_pane.renderers.remove(i)
-        
-        # for r in self.frame_pane.renderers:
-            # print(type(r), getattr(r, "glyph", None))      
-        
-        # self.rois = []     
-        
-        # boxes_id = self.frame_pane.select({'name': '123'})
-        # self.frame_pane.renderers.remove()
+    def _clear_roi(self, event):          
+        try:
+            for i in self.rois:
+                # removes bounding box from figure 
+                print(self.frame_pane.center.remove(i))
+            
+            self.rois = []
+            self.roi_count = 0
+            
+        except Exception as e:
+            print(f"Error {e}")
                 
     def _load_video(self, event):
         mime_to_ext = {
