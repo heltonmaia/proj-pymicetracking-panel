@@ -27,14 +27,15 @@ class TrackingTab:
         # buttons
         self.button_start_tracking = None
         self.button_clear_roi = None
-        self.button_done_roi = None
         
         # frames
         self.current_frame = np.ones((480,640), dtype=np.uint8) * 240
         # cv.putText(self.current_frame, "No video available yet!", (240, 200), cv.FONT_HERSHEY_COMPLEX_SMALL, 1, (0,0,0), 1)
         self.frame_count = 0
         
-        self.rois = None         
+        # store rois
+        self.rois = []
+        self.roi_count = 0
         
         # roi bounding box 
         self.bounding_box = BoxAnnotation(fill_alpha=0.3, fill_color='red')
@@ -131,15 +132,7 @@ class TrackingTab:
             height=40
             )
         
-    def _buttons(self):
-        self.button_done_roi = pn.widgets.Button(
-            name="ROI Done",
-            button_type='primary',
-            width=120,
-            height=40,
-            disabled=True
-            )
-        
+    def _buttons(self):        
         self.button_clear_roi = pn.widgets.Button(
             name="Clear ROI",
             button_type='danger',
@@ -164,12 +157,16 @@ class TrackingTab:
         self.frame_pane.on_event(PanStart, self._bb_pan_start)
         self.frame_pane.on_event(Pan, self._bb_pan)
         self.frame_pane.on_event(PanEnd, self._bb_pan_end)
+        
+        self.button_clear_roi.on_click(self._clear_roi)
 
         # clear roi
         
         # curdoc().add_periodic_callback(self._update_frames, 50)
     
     def _bb_pan_start(self, event):
+        self.roi_count += 1
+        print("Roi count:", self.roi_count)
         self.start_bounding_box['x'], self.start_bounding_box['y'] = event.x, event.y
         self.bounding_box.left = self.bounding_box.right = event.x
         self.bounding_box.bottom = self.bounding_box.top = event.y
@@ -179,18 +176,35 @@ class TrackingTab:
         self.bounding_box.right = max(self.start_bounding_box['x'], event.x)
         self.bounding_box.top = min(self.start_bounding_box['y'], event.y)
         self.bounding_box.bottom = max(self.start_bounding_box['y'], event.y)
+        
    
     def _bb_pan_end(self, event):
-        self.frame_pane.add_layout(self.bounding_box)
+        
+        aux_box =  BoxAnnotation(fill_alpha=0.3, fill_color='red', top=self.bounding_box.top, bottom=self.bounding_box.bottom, right=self.bounding_box.right, left=self.bounding_box.left, name="123")   
+        self.rois.append(aux_box)
+        
+        self.frame_pane.add_layout(aux_box)        
+        # self.rois.append(aux_box.id, [aux_box.left, aux_box.right, aux_box.top, aux_box.bottom])
+        
         self.button_clear_roi.disabled = False
-        self.button_done_roi.disabled = False
         self.button_start_tracking.disabled = False
+    
+    def _clear_roi(self, event):  
+        print(self.frame_pane.renderers)
+        
+        # for i in self.rois:
+            # self.frame_pane._property_values["layout"].remove(i)
 
-    
-    def _clear_roi(self):        
-        if self.bounding_box in self.frame_pane.renderers:
-            self.frame_pane.renderers.remove()
-    
+            # self.frame_pane.renderers.remove(i)
+        
+        # for r in self.frame_pane.renderers:
+            # print(type(r), getattr(r, "glyph", None))      
+        
+        # self.rois = []     
+        
+        # boxes_id = self.frame_pane.select({'name': '123'})
+        # self.frame_pane.renderers.remove()
+                
     def _load_video(self, event):
         mime_to_ext = {
             "video/mp4" : ".mp4",
@@ -257,7 +271,7 @@ class TrackingTab:
                          pn.Row(pn.Column(self.select_model_name,  self.slider_confidence, self.file_input), pn.Column(self.select_experiment_type, self.slider_iou)),
                          pn.Spacer(height=10),
                          pn.pane.Markdown("### ROI Configuration") ,
-                         pn.Row(self.button_start_tracking, pn.Spacer(width=40), self.button_clear_roi, self.button_done_roi),
+                         pn.Row(self.button_start_tracking, pn.Spacer(width=40), self.button_clear_roi),
                          self.frame_pane,
                          margin=(10, 0))
                          
