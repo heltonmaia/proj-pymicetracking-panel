@@ -10,6 +10,12 @@ import numpy as np
 import cv2 as cv
 
 from threading import Thread
+import zipfile
+import io
+import os
+
+MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models')
+YOLO_RESOLUTION = (640, 640)
 
 class TrackingTab:
     def __init__(self):
@@ -17,19 +23,25 @@ class TrackingTab:
         self.select_model_name  = None
         self.select_experiment_type  = None
         
+        # list of models
+        self.models_name= ["None"]
+        
         # slider
         self.slider_confidence = None
         self.slider_iou = None
         
         # file input
         self.file_input = None
+      
+        # models dir
+        self.models_dir = None
         
         # buttons
         self.button_start_tracking = None
         self.button_clear_roi = None
         
         # frames
-        self.current_frame = np.ones((480,640), dtype=np.uint8) * 240
+        self.current_frame = np.ones(YOLO_RESOLUTION, dtype=np.uint8) * 240
         # cv.putText(self.current_frame, "No video available yet!", (240, 200), cv.FONT_HERSHEY_COMPLEX_SMALL, 1, (0,0,0), 1)
         self.frame_count = 0
         
@@ -43,6 +55,9 @@ class TrackingTab:
         
         # video
         self.video_loaded = False
+        
+        # warning
+        self.warning = pn.pane.Alert("## Alert\n", alert_type="warning", visible=False)
         
         # curdoc().add_periodic_callback(self._update_frames, 50)
         # self.thread_update = Thread(target=self._load_video)
@@ -62,6 +77,9 @@ class TrackingTab:
         # file input
         self._file_input()
     
+        # models dir
+        self._models_dir()        
+        
         # buttons
         self._buttons()
     
@@ -85,18 +103,23 @@ class TrackingTab:
         img_array = np.array(img.transpose(Image.FLIP_TOP_BOTTOM).convert("RGBA"))
         self.imview = img_array.view(np.uint32).reshape(img_array.shape[:2])
 
-        self.current_frame = self.frame_pane.image_rgba(image=[self.imview], x=0, y=0, dw=640, dh=480)
+        self.current_frame = self.frame_pane.image_rgba(image=[self.imview], x=0, y=0, dw=640, dh=640)
         self.frame_view = None
         # connect functions
         self._connect_events()
     
-    def _yolo_models(self):
-        self.models_name= ["Default", "yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt"]
-            
+    def _yolo_models(self):          
         self.select_model_name = pn.widgets.Select(
             name="Select a YOLO Model",
             options=self.models_name
             )
+    
+    def _models_dir(self):
+        self.models_dir = pn.widgets.TextInput(
+            name='📁 Models folder:', 
+            value=MODELS_DIR, 
+            width=620
+        )
     
     def _experiment_type(self):
         self.experiment_type = ["EPM", "OF_Rectangular", "OF_Circular_1", "OF_Circular_2"]
@@ -150,6 +173,9 @@ class TrackingTab:
             )
     
     def _connect_events(self):
+        # load models
+        self.models_dir.param.watch(lambda event: self._load_models(event.new), 'value')
+        
         # load video
         self.file_input.param.watch(lambda event: self._load_video(event.new), 'value')
         
@@ -157,13 +183,17 @@ class TrackingTab:
         self.frame_pane.on_event(PanStart, self._bb_pan_start)
         self.frame_pane.on_event(Pan, self._bb_pan)
         self.frame_pane.on_event(PanEnd, self._bb_pan_end)
-        
+      
+        # clear roi  
         self.button_clear_roi.on_click(self._clear_roi)
-
-        # clear roi
         
+        # change frame
+        # self.current_frame.data_source.on_change("data", self._update_frames)
+        
+        # clear warnings
         # curdoc().add_periodic_callback(self._update_frames, 50)
-    
+
+    # ROI Functions---------------------------------------------------------------------------------------------------
     def _bb_pan_start(self, event):
         self.roi_count += 1
         print("Roi count:", self.roi_count)
@@ -177,29 +207,50 @@ class TrackingTab:
         self.bounding_box.top = min(self.start_bounding_box['y'], event.y)
         self.bounding_box.bottom = max(self.start_bounding_box['y'], event.y)
    
-    def _bb_pan_end(self, event):
-        
-        aux_box =  BoxAnnotation(fill_alpha=0.3, fill_color='red', top=self.bounding_box.top, bottom=self.bounding_box.bottom, right=self.bounding_box.right, left=self.bounding_box.left, name="123")   
+    def _bb_pan_end(self, event):        
+        aux_box =  BoxAnnotation(fill_alpha=0.3, fill_color='red', top=self.bounding_box.top, bottom=self.bounding_box.bottom, right=self.bounding_box.right, left=self.bounding_box.left)   
         self.rois.append(aux_box)
         
         self.frame_pane.add_layout(aux_box)        
-        # self.rois.append(aux_box.id, [aux_box.left, aux_box.right, aux_box.top, aux_box.bottom])
         
         self.button_clear_roi.disabled = False
         self.button_start_tracking.disabled = False
     
-    def _clear_roi(self, event):          
+    def _clear_roi(self, event):                 
         try:
             for i in self.rois:
                 # removes bounding box from figure 
-                print(self.frame_pane.center.remove(i))
+                self.frame_pane.center.remove(i)
             
             self.rois = []
             self.roi_count = 0
+            self.button_clear_roi.disabled = True
+            self.button_start_tracking.disabled = True          
             
         except Exception as e:
             print(f"Error {e}")
-                
+      
+    #-----------------------------------------------------------------------------------------------------------------
+    
+    def _load_models(self, event):
+        try:
+            dir = os.listdir(event)
+            self.models_name = []
+        
+            for file in dir:
+                if file.endswith('.pt'):
+                    self.models_name.append(file)
+                    
+            if self.models_dir:
+                self.select_model_name.options = self.models_name
+            else:
+                print("nao contem .pt")
+            
+        except Exception as e:
+            self.select_model_name.option = ["None"]
+            print(f"Error {e}")
+                    
+    # Video Functions-------------------------------------------------------------------------------------------------
     def _load_video(self, event):
         mime_to_ext = {
             "video/mp4" : ".mp4",
@@ -224,49 +275,95 @@ class TrackingTab:
 
             # only happens if the temp_file is created successfully
             if self.video_loaded:
-                self._collect_frames()
-                # self.thread_update.start()
-              
-    
-    def _collect_frames(self):
-        print("dento")
-        cap = cv.VideoCapture(self.tmp_file)
+                # self._collect_frames()
+                self._calculate_background()
+        
+    def _calculate_background(self):
+        try:
+            cap = cv.VideoCapture(self.tmp_file)
+            total_frames = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
+            
+            if not cap.isOpened():
+                self.object = "## Alert\n Video couldn't be loaded!"
+                self.warning.visible = True
+                return
 
-        while cap.isOpened():
-            print("doing")
-            ret, frame = cap.read()
+            sample_ret, sample_frame = cap.read()
             
-            if not ret:
-                break
+            if not sample_ret:
+                self.warning.object ="## Alert\n Couldn't grab video info!"
+                self.warning.visible=True
+                return
             
-            frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
-            frame_pil = Image.fromarray(frame)
+            # Reset video position
+            cap.set(cv.CAP_PROP_POS_FRAMES, 0)
             
-            # bokeh format
+             # Initialize frame accumulator
+            sample_frame = cv.resize(sample_frame, YOLO_RESOLUTION)
+            frame_count = 0
+            median_accumulator = np.zeros_like(sample_frame, dtype=np.float32)
+        
+            # Sample frames to calculate background (not processing every frame for efficiency)
+            # Use frame sampling to process approximately 200 frames
+            total_samples = min(200, total_frames)
+            frame_step = max(1, total_frames // total_samples)
+
+            current_frame = 0
+            
+            while current_frame < total_frames:
+                # Set position to the current frame
+                cap.set(cv.CAP_PROP_POS_FRAMES, current_frame)
+                ret, frame = cap.read()
+
+                frame = cv.resize(frame, YOLO_RESOLUTION)
+                
+                if not ret:
+                    break
+
+                # Convert to float and accumulate
+                frame_float = frame.astype(np.float32)
+                median_accumulator += frame_float
+                frame_count += 1
+                
+                # Move to next frame to sample
+                current_frame += frame_step        
+        
+            cap.release()
+            
+            if frame_count == 0:
+                self.warning.object = "No frames were processed"
+                self.warning.visible = True
+                return
+
+            # Calculate the average (approximating median for efficiency)
+            background = (median_accumulator / frame_count).astype(np.uint8)
+
+            # Save the background image
+            cv.imwrite("background.png", background)
+            
+            # Convert to bokeh format
+            frame_pil = Image.fromarray(background)
             frame_array = np.array(frame_pil.transpose(Image.FLIP_TOP_BOTTOM).convert("RGBA"))
             self.frame_view = frame_array.view(np.uint32).reshape(frame_array.shape[:2])
             
-            self.current_frame.data_source.data["image"] = self.frame_view
+            print("pingo")
+            self.current_frame.data_source.data = {"image": [self.frame_view]}
             
-        cap.release()
-        self.video_loaded = False
-        print("done")
-
-        
-    # def _update_frames(self):
-    #     if self.video_loaded:
-    #         print("atualiza")
-    #         # self.current_frame.data_source.data["image"] = self.frame_view
-        
+            # ["image"] =  self.frame_view
+                    
+        except Exception as e:
+            print(f"Background calculation error: {e}")       
+    #-----------------------------------------------------------------------------------------------------------------
         
     def get_panel(self):
         return pn.Column(pn.Row(pn.pane.Markdown("## Tracking\nTracking analysis tools will appear here.")), 
                          pn.Spacer(height=10),
                          pn.pane.Markdown("### ⚙️Settings") ,
+                         self.models_dir,
                          pn.Row(pn.Column(self.select_model_name,  self.slider_confidence, self.file_input), pn.Column(self.select_experiment_type, self.slider_iou)),
-                         pn.Spacer(height=10),
+                         pn.Spacer(height=20),
                          pn.pane.Markdown("### ROI Configuration") ,
-                         pn.Row(self.button_start_tracking, pn.Spacer(width=40), self.button_clear_roi),
+                         pn.Row(self.button_start_tracking, pn.Spacer(width=10), self.button_clear_roi),
                          self.frame_pane,
                          margin=(10, 0))
                          
