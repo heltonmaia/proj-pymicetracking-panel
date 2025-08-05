@@ -1,21 +1,23 @@
 import panel as pn
 
-from bokeh.models import BoxAnnotation
+from bokeh.models import BoxAnnotation, PolyAnnotation
 from bokeh.plotting import figure
-from bokeh.events import PanStart, Pan, PanEnd
+from bokeh.events import PanStart, Pan, PanEnd, Tap
 from bokeh.io import curdoc
 
 from PIL import Image
 import numpy as np
 import cv2 as cv
 
-from threading import Thread
+from threading import Thread, Timer
 import zipfile
+import math
 import io
 import os
 
 MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models')
 YOLO_RESOLUTION = (640, 640)
+pn.extension()
 
 class TrackingTab:
     def __init__(self):
@@ -53,11 +55,18 @@ class TrackingTab:
         self.bounding_box = BoxAnnotation(fill_alpha=0.3, fill_color='red')
         self.start_bounding_box = {'x': 0, 'y': 0}
         
+        # roi polygon annotation 
+        self.poly_annotation_points_x = []
+        self.poly_annotation_points_y = []
+        
         # video
         self.video_loaded = False
         
+        # progress bar
+        self.progress_bar = pn.indicators.Progress(name='Progress', value=0, max=100, visible=False, width=620)
+        
         # warning
-        self.warning = pn.pane.Alert("## Alert\n", alert_type="warning", visible=False)
+        self.warning = pn.pane.Alert("## Alert\n", alert_type="danger", visible=False, width=620)
         
         # curdoc().add_periodic_callback(self._update_frames, 50)
         # self.thread_update = Thread(target=self._load_video)
@@ -105,9 +114,13 @@ class TrackingTab:
 
         self.current_frame = self.frame_pane.image_rgba(image=[self.imview], x=0, y=0, dw=640, dh=640)
         self.frame_view = None
+
+        # hide warning
+        self.hide_warning = Timer(3.0, self._hide_warning)
+        
         # connect functions
         self._connect_events()
-    
+      
     def _yolo_models(self):          
         self.select_model_name = pn.widgets.Select(
             name="Select a YOLO Model",
@@ -178,23 +191,25 @@ class TrackingTab:
         
         # load video
         self.file_input.param.watch(lambda event: self._load_video(event.new), 'value')
-        
+            
         # roi box
         self.frame_pane.on_event(PanStart, self._bb_pan_start)
         self.frame_pane.on_event(Pan, self._bb_pan)
         self.frame_pane.on_event(PanEnd, self._bb_pan_end)
+        self.frame_pane.on_event(Tap, self._poly_annotation)
       
         # clear roi  
         self.button_clear_roi.on_click(self._clear_roi)
-        
-        # change frame
-        # self.current_frame.data_source.on_change("data", self._update_frames)
-        
-        # clear warnings
-        # curdoc().add_periodic_callback(self._update_frames, 50)
-
+    
     # ROI Functions---------------------------------------------------------------------------------------------------
     def _bb_pan_start(self, event):
+
+        if not self.video_loaded:
+            self.warning.object = "## Alert\n Video is not loaded!"
+            self.warning.visible = True
+            self.hide_warning.start()
+            return
+        
         self.roi_count += 1
         print("Roi count:", self.roi_count)
         self.start_bounding_box['x'], self.start_bounding_box['y'] = event.x, event.y
@@ -202,19 +217,21 @@ class TrackingTab:
         self.bounding_box.bottom = self.bounding_box.top = event.y
    
     def _bb_pan(self, event):
-        self.bounding_box.left = min(self.start_bounding_box['x'], event.x)
-        self.bounding_box.right = max(self.start_bounding_box['x'], event.x)
-        self.bounding_box.top = min(self.start_bounding_box['y'], event.y)
-        self.bounding_box.bottom = max(self.start_bounding_box['y'], event.y)
-   
-    def _bb_pan_end(self, event):        
-        aux_box =  BoxAnnotation(fill_alpha=0.3, fill_color='red', top=self.bounding_box.top, bottom=self.bounding_box.bottom, right=self.bounding_box.right, left=self.bounding_box.left)   
-        self.rois.append(aux_box)
-        
-        self.frame_pane.add_layout(aux_box)        
-        
-        self.button_clear_roi.disabled = False
-        self.button_start_tracking.disabled = False
+        if self.video_loaded:
+            self.bounding_box.left = min(self.start_bounding_box['x'], event.x)
+            self.bounding_box.right = max(self.start_bounding_box['x'], event.x)
+            self.bounding_box.top = min(self.start_bounding_box['y'], event.y)
+            self.bounding_box.bottom = max(self.start_bounding_box['y'], event.y)
+    
+    def _bb_pan_end(self, event): 
+        if self.video_loaded:       
+            aux_box =  BoxAnnotation(fill_alpha=0.3, fill_color='red', top=self.bounding_box.top, bottom=self.bounding_box.bottom, right=self.bounding_box.right, left=self.bounding_box.left)   
+            self.rois.append(aux_box)
+            
+            self.frame_pane.add_layout(aux_box)        
+            
+            self.button_clear_roi.disabled = False
+            self.button_start_tracking.disabled = False
     
     def _clear_roi(self, event):                 
         try:
@@ -230,6 +247,42 @@ class TrackingTab:
         except Exception as e:
             print(f"Error {e}")
       
+    def _poly_annotation(self, event):
+        print(f"event.x: {event.x}, event.y: {event.y}")
+
+        # x and y coordinates
+        x = int(event.x)
+        y = int(event.y)       
+        
+        # store points to draw a polygon in the future
+        self.poly_annotation_points_x.append(event.x)
+        self.poly_annotation_points_y.append(event.y)
+        size_poly = len(self.poly_annotation_points_x)
+        
+        begin_x, begin_y = self.poly_annotation_points_x[0], self.poly_annotation_points_y[0]
+        last_x, last_y = self.poly_annotation_points_x[size_poly-1], self.poly_annotation_points_y[size_poly-1]
+        
+        distance = math.sqrt((last_x-begin_x)**2 + (last_y-begin_y)**2)
+        
+        print(x,y)
+        
+        # draw a polygon on the image
+        if distance < 10 and size_poly>1:
+            polygon = PolyAnnotation(
+            fill_color="blue", fill_alpha=0.2,
+             xs=self.poly_annotation_points_x,
+             ys=self.poly_annotation_points_y,
+            )
+            self.frame_pane.add_layout(polygon)
+            
+            # send the points and reset poly_annotations
+            # self.rois.append(self.poly_annotation_points)
+            self.poly_annotation_points = []
+        else:
+            self.frame_pane.scatter(x, y, size=10, color="blue", marker="circle_dot", alpha=0.8)
+
+        print(distance)
+    
     #-----------------------------------------------------------------------------------------------------------------
     
     def _load_models(self, event):
@@ -284,8 +337,9 @@ class TrackingTab:
             total_frames = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
             
             if not cap.isOpened():
-                self.object = "## Alert\n Video couldn't be loaded!"
+                self.warning.object = "## Alert\n Video couldn't be loaded!"
                 self.warning.visible = True
+                self.hide_warning.start()
                 return
 
             sample_ret, sample_frame = cap.read()
@@ -293,7 +347,12 @@ class TrackingTab:
             if not sample_ret:
                 self.warning.object ="## Alert\n Couldn't grab video info!"
                 self.warning.visible=True
+                self.hide_warning.start()
                 return
+            
+            # display progress bar
+            self.progress_bar.visible = True
+            self.progress_bar.value = 0
             
             # Reset video position
             cap.set(cv.CAP_PROP_POS_FRAMES, 0)
@@ -325,14 +384,22 @@ class TrackingTab:
                 median_accumulator += frame_float
                 frame_count += 1
                 
+                # guarantee that warning is not visible when the progress bar is plotted
+                self.warning.visible = False
+                
+                # update progress bar value
+                self.progress_bar.value = int(current_frame/total_frames * 100)
+                                
                 # Move to next frame to sample
                 current_frame += frame_step        
         
+            self.progress_bar.visible = False
             cap.release()
             
             if frame_count == 0:
                 self.warning.object = "No frames were processed"
                 self.warning.visible = True
+                self.hide_warning.start()
                 return
 
             # Calculate the average (approximating median for efficiency)
@@ -346,14 +413,14 @@ class TrackingTab:
             frame_array = np.array(frame_pil.transpose(Image.FLIP_TOP_BOTTOM).convert("RGBA"))
             self.frame_view = frame_array.view(np.uint32).reshape(frame_array.shape[:2])
             
-            print("pingo")
             self.current_frame.data_source.data = {"image": [self.frame_view]}
-            
-            # ["image"] =  self.frame_view
-                    
+                                
         except Exception as e:
             print(f"Background calculation error: {e}")       
     #-----------------------------------------------------------------------------------------------------------------
+    
+    def _hide_warning(self):
+        self.warning.visible = False
         
     def get_panel(self):
         return pn.Column(pn.Row(pn.pane.Markdown("## Tracking\nTracking analysis tools will appear here.")), 
@@ -364,6 +431,8 @@ class TrackingTab:
                          pn.Spacer(height=20),
                          pn.pane.Markdown("### ROI Configuration") ,
                          pn.Row(self.button_start_tracking, pn.Spacer(width=10), self.button_clear_roi),
+                         self.warning,
+                         self.progress_bar,
                          self.frame_pane,
                          margin=(10, 0))
                          
