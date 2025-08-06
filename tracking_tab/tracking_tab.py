@@ -15,8 +15,12 @@ import math
 import io
 import os
 
+# debug
+import pprint
+
 MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models')
 YOLO_RESOLUTION = (640, 640)
+ROI_TYPES = ["Rectangular", "Polygon", "Circle (future implementation)"]
 pn.extension()
 
 class TrackingTab:
@@ -50,14 +54,16 @@ class TrackingTab:
         # store rois
         self.rois = []
         self.roi_count = 0
+        self.select_roi = None
         
         # roi bounding box 
         self.bounding_box = BoxAnnotation(fill_alpha=0.3, fill_color='red')
         self.start_bounding_box = {'x': 0, 'y': 0}
         
         # roi polygon annotation 
-        self.poly_annotation_points_x = []
-        self.poly_annotation_points_y = []
+        self.poly_annotation_points_draw = [] # store dot drawing
+        self.poly_annotation_points_x = [] # store x-coordinates
+        self.poly_annotation_points_y = [] # store y-coordinates
         
         # video
         self.video_loaded = False
@@ -78,6 +84,7 @@ class TrackingTab:
         # selects
         self._yolo_models()
         self._experiment_type()
+        self._select_roi()
         
         # sliders
         self._confidence_threshold()
@@ -114,10 +121,7 @@ class TrackingTab:
 
         self.current_frame = self.frame_pane.image_rgba(image=[self.imview], x=0, y=0, dw=640, dh=640)
         self.frame_view = None
-
-        # hide warning
-        self.hide_warning = Timer(3.0, self._hide_warning)
-        
+                
         # connect functions
         self._connect_events()
       
@@ -142,6 +146,12 @@ class TrackingTab:
             options=self.experiment_type
             )
     
+    def _select_roi(self):
+        self.select_roi = pn.widgets.Select(
+            name="ROI Type",
+            options = ROI_TYPES
+        )
+        
     def _confidence_threshold(self):
         self.slider_confidence = pn.widgets.FloatSlider(
             name="Confidence Threshold",
@@ -149,8 +159,8 @@ class TrackingTab:
             end=0.9,
             step=0.01,
             value=0.5
-            ) 
-    
+            )
+            
     def _iou_threshold(self):
         self.slider_iou = pn.widgets.FloatSlider(
             name="IOU Threshold",
@@ -185,6 +195,11 @@ class TrackingTab:
             disabled=True
             )
     
+    def _thread_hide_warning(self):
+        # hide warning
+        self.hide_warning = Timer(3.0, self._hide_warning)
+        self.hide_warning.start()
+        
     def _connect_events(self):
         # load models
         self.models_dir.param.watch(lambda event: self._load_models(event.new), 'value')
@@ -202,29 +217,28 @@ class TrackingTab:
         self.button_clear_roi.on_click(self._clear_roi)
     
     # ROI Functions---------------------------------------------------------------------------------------------------
-    def _bb_pan_start(self, event):
-
-        if not self.video_loaded:
-            self.warning.object = "## Alert\n Video is not loaded!"
-            self.warning.visible = True
-            self.hide_warning.start()
-            return
+    def _bb_pan_start(self, event):      
+        if self.select_roi.value == "Rectangular":  
+            if not self.video_loaded:
+                self.warning.object = "## Alert\n Video is not loaded!"
+                self.warning.visible = True
+                self._thread_hide_warning()
+                return
         
-        self.roi_count += 1
-        print("Roi count:", self.roi_count)
-        self.start_bounding_box['x'], self.start_bounding_box['y'] = event.x, event.y
-        self.bounding_box.left = self.bounding_box.right = event.x
-        self.bounding_box.bottom = self.bounding_box.top = event.y
+            self.roi_count += 1
+            self.start_bounding_box['x'], self.start_bounding_box['y'] = event.x, event.y
+            self.bounding_box.left = self.bounding_box.right = event.x
+            self.bounding_box.bottom = self.bounding_box.top = event.y
    
     def _bb_pan(self, event):
-        if self.video_loaded:
+        if self.video_loaded and self.select_roi.value == "Rectangular":
             self.bounding_box.left = min(self.start_bounding_box['x'], event.x)
             self.bounding_box.right = max(self.start_bounding_box['x'], event.x)
             self.bounding_box.top = min(self.start_bounding_box['y'], event.y)
             self.bounding_box.bottom = max(self.start_bounding_box['y'], event.y)
     
     def _bb_pan_end(self, event): 
-        if self.video_loaded:       
+        if self.video_loaded and self.select_roi.value == "Rectangular":       
             aux_box =  BoxAnnotation(fill_alpha=0.3, fill_color='red', top=self.bounding_box.top, bottom=self.bounding_box.bottom, right=self.bounding_box.right, left=self.bounding_box.left)   
             self.rois.append(aux_box)
             
@@ -233,56 +247,73 @@ class TrackingTab:
             self.button_clear_roi.disabled = False
             self.button_start_tracking.disabled = False
     
-    def _clear_roi(self, event):                 
-        try:
-            for i in self.rois:
-                # removes bounding box from figure 
-                self.frame_pane.center.remove(i)
+    def _poly_annotation(self, event):      
+        if self.select_roi.value == "Polygon":
+            if not self.video_loaded:
+                self.warning.object = "## Alert\nOperation is invalid! Video is not loaded! "
+                self.warning.visible = True
+                self._thread_hide_warning()
+                return      
             
+            self.warning.visible = False
+            self.button_clear_roi.disabled = False
+            self.button_start_tracking.disabled = False
+                
+            # x and y coordinates (draw circle_dot)
+            x = int(event.x)
+            y = int(event.y)  
+            
+            # store points to draw a polygon in the future
+            self.poly_annotation_points_x.append(event.x)
+            self.poly_annotation_points_y.append(event.y)
+            size_poly = len(self.poly_annotation_points_x)
+            
+            begin_x, begin_y = self.poly_annotation_points_x[0], self.poly_annotation_points_y[0]
+            last_x, last_y = self.poly_annotation_points_x[size_poly-1], self.poly_annotation_points_y[size_poly-1]
+            
+            distance = math.sqrt((last_x-begin_x)**2 + (last_y-begin_y)**2)
+                    
+            # draw a polygon on the image
+            if distance < 10 and size_poly>1:
+                polygon = PolyAnnotation(
+                fill_color="blue", fill_alpha=0.2,
+                xs=self.poly_annotation_points_x,
+                ys=self.poly_annotation_points_y,
+                )
+                
+                self.frame_pane.add_layout(polygon)            
+                
+                # send the points and reset poly_annotations
+                self.rois.append(polygon)
+                self.roi_count += 1
+                
+                self.poly_annotation_points_x, self.poly_annotation_points_y = [], []
+        
+            else:
+                dot = self.frame_pane.scatter(x, y, size=10, color="blue", marker="circle_dot", alpha=0.8)
+                self.poly_annotation_points_draw.append(dot)
+                
+    def _clear_roi(self, event):                 
+        try:                        
+            if len(self.rois):
+                for i in self.rois:    
+                    # removes bounding box from figure 
+                    self.frame_pane.center.remove(i)
+                    
+            if len(self.poly_annotation_points_draw):
+                for i in self.poly_annotation_points_draw:
+                    # removes dots from figure
+                    self.frame_pane.renderers.remove(i)
+                
+                self.poly_annotation_points_draw = []
+                
             self.rois = []
             self.roi_count = 0
             self.button_clear_roi.disabled = True
             self.button_start_tracking.disabled = True          
             
         except Exception as e:
-            print(f"Error {e}")
-      
-    def _poly_annotation(self, event):
-        print(f"event.x: {event.x}, event.y: {event.y}")
-
-        # x and y coordinates
-        x = int(event.x)
-        y = int(event.y)       
-        
-        # store points to draw a polygon in the future
-        self.poly_annotation_points_x.append(event.x)
-        self.poly_annotation_points_y.append(event.y)
-        size_poly = len(self.poly_annotation_points_x)
-        
-        begin_x, begin_y = self.poly_annotation_points_x[0], self.poly_annotation_points_y[0]
-        last_x, last_y = self.poly_annotation_points_x[size_poly-1], self.poly_annotation_points_y[size_poly-1]
-        
-        distance = math.sqrt((last_x-begin_x)**2 + (last_y-begin_y)**2)
-        
-        print(x,y)
-        
-        # draw a polygon on the image
-        if distance < 10 and size_poly>1:
-            polygon = PolyAnnotation(
-            fill_color="blue", fill_alpha=0.2,
-             xs=self.poly_annotation_points_x,
-             ys=self.poly_annotation_points_y,
-            )
-            self.frame_pane.add_layout(polygon)
-            
-            # send the points and reset poly_annotations
-            # self.rois.append(self.poly_annotation_points)
-            self.poly_annotation_points = []
-        else:
-            self.frame_pane.scatter(x, y, size=10, color="blue", marker="circle_dot", alpha=0.8)
-
-        print(distance)
-    
+            print(f"Error {e}")        
     #-----------------------------------------------------------------------------------------------------------------
     
     def _load_models(self, event):
@@ -339,7 +370,7 @@ class TrackingTab:
             if not cap.isOpened():
                 self.warning.object = "## Alert\n Video couldn't be loaded!"
                 self.warning.visible = True
-                self.hide_warning.start()
+                self._thread_hide_warning()
                 return
 
             sample_ret, sample_frame = cap.read()
@@ -347,7 +378,7 @@ class TrackingTab:
             if not sample_ret:
                 self.warning.object ="## Alert\n Couldn't grab video info!"
                 self.warning.visible=True
-                self.hide_warning.start()
+                self._thread_hide_warning()
                 return
             
             # display progress bar
@@ -399,7 +430,7 @@ class TrackingTab:
             if frame_count == 0:
                 self.warning.object = "No frames were processed"
                 self.warning.visible = True
-                self.hide_warning.start()
+                self._thread_hide_warning()
                 return
 
             # Calculate the average (approximating median for efficiency)
@@ -429,8 +460,11 @@ class TrackingTab:
                          self.models_dir,
                          pn.Row(pn.Column(self.select_model_name,  self.slider_confidence, self.file_input), pn.Column(self.select_experiment_type, self.slider_iou)),
                          pn.Spacer(height=20),
-                         pn.pane.Markdown("### ROI Configuration") ,
+                         pn.pane.Markdown("### ROI Configuration"),
+                         self.select_roi,
+                         pn.Spacer(height=5),
                          pn.Row(self.button_start_tracking, pn.Spacer(width=10), self.button_clear_roi),
+                         pn.Spacer(height=5),
                          self.warning,
                          self.progress_bar,
                          self.frame_pane,
