@@ -20,7 +20,7 @@ import pprint
 
 MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models')
 YOLO_RESOLUTION = (640, 640)
-ROI_TYPES = ["Rectangular", "Polygon", "Circle (future implementation)"]
+ROI_TYPES = ["Rectangle", "Polygon", "Circle"]
 pn.extension()
 
 class TrackingTab:
@@ -64,6 +64,11 @@ class TrackingTab:
         self.poly_annotation_points_draw = [] # store dot drawing
         self.poly_annotation_points_x = [] # store x-coordinates
         self.poly_annotation_points_y = [] # store y-coordinates
+        
+        # roi circle
+        self.circle_annotation_points_draw = []
+        self.circle_annotation_points = []
+        self.circle_x_y_points = []
         
         # video
         self.video_loaded = False
@@ -139,7 +144,7 @@ class TrackingTab:
         )
     
     def _experiment_type(self):
-        self.experiment_type = ["EPM", "OF_Rectangular", "OF_Circular_1", "OF_Circular_2"]
+        self.experiment_type = ["EPM", "OF_Rectangle", "OF_Circular_1", "OF_Circular_2"]
         
         self.select_experiment_type = pn.widgets.Select(
             name="Experiment Type",
@@ -212,13 +217,14 @@ class TrackingTab:
         self.frame_pane.on_event(Pan, self._bb_pan)
         self.frame_pane.on_event(PanEnd, self._bb_pan_end)
         self.frame_pane.on_event(Tap, self._poly_annotation)
+        self.frame_pane.on_event(Tap, self._circle_annotation)
       
         # clear roi  
         self.button_clear_roi.on_click(self._clear_roi)
     
     # ROI Functions---------------------------------------------------------------------------------------------------
     def _bb_pan_start(self, event):      
-        if self.select_roi.value == "Rectangular":  
+        if self.select_roi.value == "Rectangle":  
             if not self.video_loaded:
                 self.warning.object = "## Alert\n Video is not loaded!"
                 self.warning.visible = True
@@ -231,14 +237,14 @@ class TrackingTab:
             self.bounding_box.bottom = self.bounding_box.top = event.y
    
     def _bb_pan(self, event):
-        if self.video_loaded and self.select_roi.value == "Rectangular":
+        if self.video_loaded and self.select_roi.value == "Rectangle":
             self.bounding_box.left = min(self.start_bounding_box['x'], event.x)
             self.bounding_box.right = max(self.start_bounding_box['x'], event.x)
             self.bounding_box.top = min(self.start_bounding_box['y'], event.y)
             self.bounding_box.bottom = max(self.start_bounding_box['y'], event.y)
     
     def _bb_pan_end(self, event): 
-        if self.video_loaded and self.select_roi.value == "Rectangular":       
+        if self.video_loaded and self.select_roi.value == "Rectangle":       
             aux_box =  BoxAnnotation(fill_alpha=0.3, fill_color='red', top=self.bounding_box.top, bottom=self.bounding_box.bottom, right=self.bounding_box.right, left=self.bounding_box.left)   
             self.rois.append(aux_box)
             
@@ -292,20 +298,56 @@ class TrackingTab:
             else:
                 dot = self.frame_pane.scatter(x, y, size=10, color="blue", marker="circle_dot", alpha=0.8)
                 self.poly_annotation_points_draw.append(dot)
+         
+    def _circle_annotation(self, event):
+        if self.select_roi.value == "Circle":
+            # x and y coordinates
+            x = event.x
+            y = event.y
+            
+            dots_number = len(self.circle_annotation_points_draw)
+            
+            if dots_number < 2:
+                dot = self.frame_pane.scatter(x, y, size=10, color="green", marker="circle_dot", alpha=0.8)
+                self.circle_annotation_points.append(dot)
+                self.circle_annotation_points_draw.append(dot)
+                self.circle_x_y_points.append((x,y))
                 
-    def _clear_roi(self, event):                 
-        try:                        
-            if len(self.rois):
-                for i in self.rois:    
-                    # removes bounding box from figure 
-                    self.frame_pane.center.remove(i)
+                dots_number = len(self.circle_annotation_points)
+
+                if dots_number==2:
+                    x0, y0 = self.circle_x_y_points[0]
+                    x1, y1 = self.circle_x_y_points[1]
+                    radius = (abs(x0-x1), abs(y0-y1))
                     
+                    circle_draw = self.frame_pane.circle(x=x0, y=y0, radius=radius, radius_units='screen', color="green", alpha=0.3, hit_dilation=10.0)
+                    self.rois.append(circle_draw)
+                    
+                    # clear dots storage
+                    self.circle_annotation_points = []
+                    self.circle_x_y_points = []
+                    self.button_clear_roi.disabled = False               
+               
+    def _clear_roi(self, event):                 
+        try:    
+            # removes bounding box/polygon from figure                                
+            if len(self.rois):
+                if (self.select_roi.value == "Rectangle" or self.select_roi.value == "Polygon"):
+                    for i in self.rois:
+                        self.frame_pane.center.remove(i)
+                
+            # removes dots in a polygon from figure 
             if len(self.poly_annotation_points_draw):
                 for i in self.poly_annotation_points_draw:
-                    # removes dots from figure
                     self.frame_pane.renderers.remove(i)
-                
-                self.poly_annotation_points_draw = []
+                        
+                    self.poly_annotation_points_draw = []
+                    
+            # removes dots in a circle from figure 
+            if len(self.circle_annotation_points_draw):
+                for i in self.circle_annotation_points_draw:
+                    self.frame_pane.renderers.remove(i)
+                self.circle_annotation_points_draw = []
                 
             self.rois = []
             self.roi_count = 0
@@ -388,8 +430,8 @@ class TrackingTab:
             # Reset video position
             cap.set(cv.CAP_PROP_POS_FRAMES, 0)
             
-             # Initialize frame accumulator
-            sample_frame = cv.resize(sample_frame, YOLO_RESOLUTION)
+            # Initialize frame accumulator
+            # sample_frame = cv.resize(sample_frame, YOLO_RESOLUTION)
             frame_count = 0
             median_accumulator = np.zeros_like(sample_frame, dtype=np.float32)
         
@@ -398,6 +440,10 @@ class TrackingTab:
             total_samples = min(200, total_frames)
             frame_step = max(1, total_frames // total_samples)
 
+            height, width, _ = sample_frame.shape
+            self.frame_pane.width = width
+            self.frame_pane.height = height
+            
             current_frame = 0
             
             while current_frame < total_frames:
@@ -405,7 +451,7 @@ class TrackingTab:
                 cap.set(cv.CAP_PROP_POS_FRAMES, current_frame)
                 ret, frame = cap.read()
 
-                frame = cv.resize(frame, YOLO_RESOLUTION)
+                # frame = cv.resize(frame, YOLO_RESOLUTION)
                 
                 if not ret:
                     break
