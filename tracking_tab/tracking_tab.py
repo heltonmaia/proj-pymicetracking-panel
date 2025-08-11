@@ -11,6 +11,7 @@ import cv2 as cv
 
 from threading import Thread, Timer
 import zipfile
+import json
 import math
 import io
 import os
@@ -45,6 +46,7 @@ class TrackingTab:
         # buttons
         self.button_start_tracking = None
         self.button_clear_roi = None
+        self.button_save_roi_json = None
         
         # frames
         self.current_frame = np.ones(YOLO_RESOLUTION, dtype=np.uint8) * 240
@@ -199,6 +201,14 @@ class TrackingTab:
             height=40,
             disabled=True
             )
+        
+        self.button_save_roi_json = pn.widgets.Button(
+            name="Save Roi JSON",
+            button_type='primary',
+            width=120,
+            height=40,
+            disabled=False
+            )
     
     def _thread_hide_warning(self):
         # hide warning
@@ -221,6 +231,7 @@ class TrackingTab:
       
         # clear roi  
         self.button_clear_roi.on_click(self._clear_roi)
+        self.button_save_roi_json.on_click(self.to_json)
     
     # ROI Functions---------------------------------------------------------------------------------------------------
     def _bb_pan_start(self, event):      
@@ -301,6 +312,8 @@ class TrackingTab:
          
     def _circle_annotation(self, event):
         if self.select_roi.value == "Circle":
+            self.button_clear_roi.disabled = False               
+            
             # x and y coordinates
             x = event.x
             y = event.y
@@ -314,7 +327,8 @@ class TrackingTab:
                 self.circle_x_y_points.append((x,y))
                 
                 dots_number = len(self.circle_annotation_points)
-
+                # pprint.pprint("left: ", self.frame_pane.left)
+                
                 if dots_number==2:
                     x0, y0 = self.circle_x_y_points[0]
                     x1, y1 = self.circle_x_y_points[1]
@@ -322,20 +336,22 @@ class TrackingTab:
                     
                     circle_draw = self.frame_pane.circle(x=x0, y=y0, radius=radius, radius_units='screen', color="green", alpha=0.3, hit_dilation=10.0)
                     self.rois.append(circle_draw)
+                    self.roi_count += 1
                     
                     # clear dots storage
                     self.circle_annotation_points = []
-                    self.circle_x_y_points = []
-                    self.button_clear_roi.disabled = False               
+                    self.circle_x_y_points = []    
                
     def _clear_roi(self, event):                 
         try:    
             # removes bounding box/polygon from figure                                
-            if len(self.rois):
+            if self.roi_count:
                 if (self.select_roi.value == "Rectangle" or self.select_roi.value == "Polygon"):
                     for i in self.rois:
                         self.frame_pane.center.remove(i)
-                
+                # if self.select_roi.value == "Circle":
+                        # self.frame_pane= []
+                 
             # removes dots in a polygon from figure 
             if len(self.poly_annotation_points_draw):
                 for i in self.poly_annotation_points_draw:
@@ -499,6 +515,19 @@ class TrackingTab:
     def _hide_warning(self):
         self.warning.visible = False
         
+    #-----------------------------------------------------------------------------------------------------------------
+
+    def to_json(self, event):
+        if self.roi_count !=0:
+            with open("teste.json", "w") as file:
+                teste = [
+                {"nome": "Camiseta", "preco": 39.90, "estoque": 100},
+                {"nome": "Calça", "preco": 79.90, "estoque": 50},
+                {"nome": "Tênis", "preco": 129.90, "estoque": 30}
+                ]
+                json.dump(teste, file)
+
+    
     def get_panel(self):
         return pn.Column(pn.Row(pn.pane.Markdown("## Tracking\nTracking analysis tools will appear here.")), 
                          pn.Spacer(height=10),
@@ -509,7 +538,7 @@ class TrackingTab:
                          pn.pane.Markdown("### ROI Configuration"),
                          self.select_roi,
                          pn.Spacer(height=5),
-                         pn.Row(self.button_start_tracking, pn.Spacer(width=10), self.button_clear_roi),
+                         pn.Row(self.button_start_tracking, pn.Spacer(width=10), self.button_clear_roi, pn.Spacer(width=10), self.button_save_roi_json),
                          pn.Spacer(height=5),
                          self.warning,
                          self.progress_bar,
