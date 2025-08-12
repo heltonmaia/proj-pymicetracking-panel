@@ -9,9 +9,8 @@ from PIL import Image
 import numpy as np
 import cv2 as cv
 
+from tracking_tab.export import export_tracking_data
 from threading import Thread, Timer
-import zipfile
-import json
 import math
 import io
 import os
@@ -207,7 +206,7 @@ class TrackingTab:
             button_type='primary',
             width=120,
             height=40,
-            disabled=False
+            disabled=True
             )
     
     def _thread_hide_warning(self):
@@ -256,14 +255,15 @@ class TrackingTab:
     
     def _bb_pan_end(self, event): 
         if self.video_loaded and self.select_roi.value == "Rectangle":       
-            aux_box =  BoxAnnotation(fill_alpha=0.3, fill_color='red', top=self.bounding_box.top, bottom=self.bounding_box.bottom, right=self.bounding_box.right, left=self.bounding_box.left)   
+            aux_box =  BoxAnnotation(top_units="data", bottom_units="data", left_units="data", right_units="data", fill_alpha=0.3, fill_color="red", top=self.bounding_box.top, bottom=self.bounding_box.bottom, right=self.bounding_box.right, left=self.bounding_box.left)   
             self.rois.append(aux_box)
             
             self.frame_pane.add_layout(aux_box)        
             
             self.button_clear_roi.disabled = False
             self.button_start_tracking.disabled = False
-    
+            self.button_save_roi_json.disabled = False
+            
     def _poly_annotation(self, event):      
         if self.select_roi.value == "Polygon":
             if not self.video_loaded:
@@ -275,6 +275,7 @@ class TrackingTab:
             self.warning.visible = False
             self.button_clear_roi.disabled = False
             self.button_start_tracking.disabled = False
+            self.button_save_roi_json.disabled = False
                 
             # x and y coordinates (draw circle_dot)
             x = int(event.x)
@@ -312,13 +313,15 @@ class TrackingTab:
          
     def _circle_annotation(self, event):
         if self.select_roi.value == "Circle":
+            self.button_start_tracking.disabled = False
             self.button_clear_roi.disabled = False               
-            
+            self.button_save_roi_json.disabled = False
+
             # x and y coordinates
             x = event.x
             y = event.y
             
-            dots_number = len(self.circle_annotation_points_draw)
+            dots_number = len(self.circle_annotation_points)
             
             if dots_number < 2:
                 dot = self.frame_pane.scatter(x, y, size=10, color="green", marker="circle_dot", alpha=0.8)
@@ -334,7 +337,7 @@ class TrackingTab:
                     x1, y1 = self.circle_x_y_points[1]
                     radius = (abs(x0-x1), abs(y0-y1))
                     
-                    circle_draw = self.frame_pane.circle(x=x0, y=y0, radius=radius, radius_units='screen', color="green", alpha=0.3, hit_dilation=10.0)
+                    circle_draw = self.frame_pane.circle(x=x0, y=y0, radius=radius, radius_units='screen', color="green", alpha=0.3)
                     self.rois.append(circle_draw)
                     self.roi_count += 1
                     
@@ -368,7 +371,9 @@ class TrackingTab:
             self.rois = []
             self.roi_count = 0
             self.button_clear_roi.disabled = True
-            self.button_start_tracking.disabled = True          
+            self.button_start_tracking.disabled = True    
+            self.button_save_roi_json.disabled = True
+      
             
         except Exception as e:
             print(f"Error {e}")        
@@ -457,6 +462,7 @@ class TrackingTab:
             frame_step = max(1, total_frames // total_samples)
 
             height, width, _ = sample_frame.shape
+            print(f"h: {height}, width: {width}")
             self.frame_pane.width = width
             self.frame_pane.height = height
             
@@ -518,15 +524,7 @@ class TrackingTab:
     #-----------------------------------------------------------------------------------------------------------------
 
     def to_json(self, event):
-        if self.roi_count !=0:
-            with open("teste.json", "w") as file:
-                teste = [
-                {"nome": "Camiseta", "preco": 39.90, "estoque": 100},
-                {"nome": "Calça", "preco": 79.90, "estoque": 50},
-                {"nome": "Tênis", "preco": 129.90, "estoque": 30}
-                ]
-                json.dump(teste, file)
-
+        export_tracking_data(self.rois, self.frame_pane.height, self.frame_pane.width)
     
     def get_panel(self):
         return pn.Column(pn.Row(pn.pane.Markdown("## Tracking\nTracking analysis tools will appear here.")), 
