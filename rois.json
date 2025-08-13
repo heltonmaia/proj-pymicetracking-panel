@@ -1,14 +1,13 @@
-[
-  {
-    "top": 107,
-    "bottom": 559,
-    "right": 501,
-    "left": 73
-  },
-  {
-    "top": 212,
-    "bottom": 475,
-    "right": 535,
-    "left": 117
-  }
-]
+{
+  "rois": [
+    {
+      "type": "circle",
+      "center": [
+        230,
+        387
+      ],
+      "radius": 1
+    }
+  ],
+  "roi_counts": 1
+}

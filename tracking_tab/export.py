@@ -2,32 +2,61 @@ import json
 from datetime import datetime
 
 import bokeh
-from bokeh.models import BoxAnnotation, PolyAnnotation
+from bokeh.models import BoxAnnotation, PolyAnnotation, Circle
+
+# debug
 from pprint import pprint
 
-def export_tracking_data(rois, image_height, image_width):
+def export_tracking_data(rois, roi_count, image_height, image_width):
     json_list = []
     
-    for roi in rois: 
+    json_dict = {
+        "rois": [],
+        "roi_counts": roi_count
+    }
+    
+    for roi in rois:
+                
         if str(type(roi)) == "<class 'bokeh.models.annotations.geometry.BoxAnnotation'>":
-            print("Box")
-            # pprint(vars(roi))
-            
+            # validation to avoid negative numbers
+            if roi.top < 0:
+                roi.top = 0
+            if roi.bottom < 0:
+                roi.bottom = 0
+            if roi.right < 0:
+                roi.right = 0
+            if roi.left < 0:
+                roi.left = 0
+
             json_list.append({
+                "type": "box",
                 "top": int(roi.top),
                 "bottom": int(roi.bottom),
                 "right": int(roi.right),
                 "left": int(roi.left)
             })
                         
-        # if str(type(roi)) == "<class 'bokeh.models.annotations.geometry.PolyAnnotation'>":
-        #     print("Poly")
-        #     pprint(vars(roi))
+        if str(type(roi)) == "<class 'bokeh.models.annotations.geometry.PolyAnnotation'>":           
+            json_list.append({
+                "type": "polygon",
+                "pts": list(zip(map(int, roi.xs), map(int, roi.ys)))
+            })
             
-        # if str(type(roi)) == "<class 'bokeh.models.renderers.glyph_renderer.GlyphRenderer'>":
-        #     print("Circle")
-        #     pprint(vars(roi))
+        if str(type(roi)) == "<class 'bokeh.models.renderers.glyph_renderer.GlyphRenderer'>":
+            print("Circle")
+            
+            json_list.append({
+                "type": "circle",
+                "center": (int(roi.glyph.x), int(roi.glyph.y)),
+                "radius": 1
+            })
+            
+            # pprint(vars(roi))
+            pprint(vars(roi.glyph))
+            print(roi.glyph.x, roi.glyph.y, roi.glyph)
         
     print(json_list)
+    
+    json_dict["rois"] = json_list
     with open("rois.json", "w") as file:
-        json.dump(json_list, file, indent=2)
+        json.dump(json_dict, file, indent=2)

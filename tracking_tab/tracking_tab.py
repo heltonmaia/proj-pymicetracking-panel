@@ -1,6 +1,6 @@
 import panel as pn
 
-from bokeh.models import BoxAnnotation, PolyAnnotation
+from bokeh.models import BoxAnnotation, PolyAnnotation, Circle, Range1d
 from bokeh.plotting import figure
 from bokeh.events import PanStart, Pan, PanEnd, Tap
 from bokeh.io import curdoc
@@ -16,7 +16,7 @@ import io
 import os
 
 # debug
-import pprint
+from pprint import pprint
 
 MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models')
 YOLO_RESOLUTION = (640, 640)
@@ -312,7 +312,7 @@ class TrackingTab:
                 self.poly_annotation_points_draw.append(dot)
          
     def _circle_annotation(self, event):
-        if self.select_roi.value == "Circle":
+        if self.select_roi.value == "Circle": # self.video_loaded and
             self.button_start_tracking.disabled = False
             self.button_clear_roi.disabled = False               
             self.button_save_roi_json.disabled = False
@@ -330,7 +330,6 @@ class TrackingTab:
                 self.circle_x_y_points.append((x,y))
                 
                 dots_number = len(self.circle_annotation_points)
-                # pprint.pprint("left: ", self.frame_pane.left)
                 
                 if dots_number==2:
                     x0, y0 = self.circle_x_y_points[0]
@@ -346,28 +345,32 @@ class TrackingTab:
                     self.circle_x_y_points = []    
                
     def _clear_roi(self, event):                 
-        try:    
-            # removes bounding box/polygon from figure                                
-            if self.roi_count:
-                if (self.select_roi.value == "Rectangle" or self.select_roi.value == "Polygon"):
-                    for i in self.rois:
-                        self.frame_pane.center.remove(i)
-                # if self.select_roi.value == "Circle":
-                        # self.frame_pane= []
-                 
-            # removes dots in a polygon from figure 
-            if len(self.poly_annotation_points_draw):
-                for i in self.poly_annotation_points_draw:
-                    self.frame_pane.renderers.remove(i)
-                        
-                    self.poly_annotation_points_draw = []
+        try:
+            if self.roi_count > 0:    
+                for roi in self.rois:
+                    # remove bounding box
+                    if str(type(roi)) == "<class 'bokeh.models.annotations.geometry.BoxAnnotation'>":
+                        # for i in self.rois:
+                        self.frame_pane.center.remove(roi)
                     
-            # removes dots in a circle from figure 
-            if len(self.circle_annotation_points_draw):
-                for i in self.circle_annotation_points_draw:
-                    self.frame_pane.renderers.remove(i)
-                self.circle_annotation_points_draw = []
-                
+                    # remove polygon
+                    if str(type(roi)) == "<class 'bokeh.models.annotations.geometry.PolyAnnotation'>":
+                        self.frame_pane.center.remove(roi)
+                        
+                        for i in self.poly_annotation_points_draw:
+                            self.frame_pane.renderers.remove(i)
+                            
+                        self.poly_annotation_points_draw = []      
+                    
+                    # remove dots in a circle
+                    if str(type(roi)) == "<class 'bokeh.models.renderers.glyph_renderer.GlyphRenderer'>":
+                        self.frame_pane.renderers = [r for r in self.frame_pane.renderers if not isinstance(r.glyph, Circle)]
+                        
+                        for i in self.circle_annotation_points_draw:
+                            self.frame_pane.renderers.remove(i)
+                            
+                        self.circle_annotation_points_draw = []
+                        
             self.rois = []
             self.roi_count = 0
             self.button_clear_roi.disabled = True
@@ -462,9 +465,12 @@ class TrackingTab:
             frame_step = max(1, total_frames // total_samples)
 
             height, width, _ = sample_frame.shape
-            print(f"h: {height}, width: {width}")
+                        
+            # redefine figure axis            
             self.frame_pane.width = width
             self.frame_pane.height = height
+            self.frame_pane.x_range = Range1d(0, width)
+            self.frame_pane.y_range = Range1d(0, height)
             
             current_frame = 0
             
@@ -472,9 +478,7 @@ class TrackingTab:
                 # Set position to the current frame
                 cap.set(cv.CAP_PROP_POS_FRAMES, current_frame)
                 ret, frame = cap.read()
-
-                # frame = cv.resize(frame, YOLO_RESOLUTION)
-                
+                                
                 if not ret:
                     break
 
@@ -512,8 +516,9 @@ class TrackingTab:
             frame_array = np.array(frame_pil.transpose(Image.FLIP_TOP_BOTTOM).convert("RGBA"))
             self.frame_view = frame_array.view(np.uint32).reshape(frame_array.shape[:2])
             
-            self.current_frame.data_source.data = {"image": [self.frame_view]}
-                                
+            self.current_frame = self.frame_pane.image_rgba(image=[self.frame_view], x=0, y=0, dw=width, dh=height)
+            # self.current_frame.data_source.data["image"] = [self.frame_view]
+            
         except Exception as e:
             print(f"Background calculation error: {e}")       
     #-----------------------------------------------------------------------------------------------------------------
@@ -524,7 +529,7 @@ class TrackingTab:
     #-----------------------------------------------------------------------------------------------------------------
 
     def to_json(self, event):
-        export_tracking_data(self.rois, self.frame_pane.height, self.frame_pane.width)
+        export_tracking_data(self.rois, self.roi_count, self.frame_pane.height, self.frame_pane.width)
     
     def get_panel(self):
         return pn.Column(pn.Row(pn.pane.Markdown("## Tracking\nTracking analysis tools will appear here.")), 
