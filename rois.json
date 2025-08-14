@@ -1,12 +1,11 @@
 {
   "rois": [
     {
-      "type": "circle",
-      "center": [
-        197,
-        270
-      ],
-      "radius": 101.77244378976609
+      "type": "box",
+      "top": 27,
+      "bottom": 342,
+      "right": 503,
+      "left": 100
     }
   ],
   "roi_counts": 1
