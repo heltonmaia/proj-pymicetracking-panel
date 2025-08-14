@@ -48,7 +48,7 @@ def export_tracking_data(rois, roi_count, image_height, image_width):
             json_list.append({
                 "type": "circle",
                 "center": (int(roi.glyph.x), int(roi.glyph.y)),
-                "radius": 1
+                "radius": int(roi.glyph.radius)
             })
             
             # pprint(vars(roi))

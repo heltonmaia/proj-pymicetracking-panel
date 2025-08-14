@@ -202,7 +202,7 @@ class TrackingTab:
             )
         
         self.button_save_roi_json = pn.widgets.Button(
-            name="Save Roi JSON",
+            name="Save ROI JSON",
             button_type='primary',
             width=120,
             height=40,
@@ -334,7 +334,7 @@ class TrackingTab:
                 if dots_number==2:
                     x0, y0 = self.circle_x_y_points[0]
                     x1, y1 = self.circle_x_y_points[1]
-                    radius = (abs(x0-x1), abs(y0-y1))
+                    radius = ((x0-x1)**2 + (y0-y1)**2) **(1/2)
                     
                     circle_draw = self.frame_pane.circle(x=x0, y=y0, radius=radius, radius_units='screen', color="green", alpha=0.3)
                     self.rois.append(circle_draw)

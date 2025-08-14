@@ -3,10 +3,10 @@
     {
       "type": "circle",
       "center": [
-        230,
-        387
+        197,
+        270
       ],
-      "radius": 1
+      "radius": 101.77244378976609
     }
   ],
   "roi_counts": 1
