@@ -38,18 +38,14 @@ def export_tracking_data(rois, roi_count, image_height, image_width):
             })
                         
         if str(type(roi)) == "<class 'bokeh.models.annotations.geometry.PolyAnnotation'>":           
-            print(roi.ys)
             fixed_ys = [image_height-i for i in roi.ys]
-            print(fixed_ys)
             
             json_list.append({
                 "type": "polygon",
                 "pts": list(zip(map(int, roi.xs), map(int, fixed_ys)))
             })
             
-        if str(type(roi)) == "<class 'bokeh.models.renderers.glyph_renderer.GlyphRenderer'>":
-            print("Circle")
-            
+        if str(type(roi)) == "<class 'bokeh.models.renderers.glyph_renderer.GlyphRenderer'>":            
             json_list.append({
                 "type": "circle",
                 "center": (int(roi.glyph.x), image_height-int(roi.glyph.y)), 

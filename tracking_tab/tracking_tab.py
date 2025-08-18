@@ -30,7 +30,7 @@ class TrackingTab:
         self.select_experiment_type  = None
         
         # list of models
-        self.models_name= ["None"]
+        self.models_name= ["Default"]
         
         # slider
         self.slider_confidence = None
@@ -74,14 +74,16 @@ class TrackingTab:
         # video
         self.video_loaded = False
         
+        # tracking 
+        self.callback_tracking = None
+        # pn.state.add_periodic_callback(self._start_tracking, 50)
+        # self.callback_tracking.stop()
+        
         # progress bar
         self.progress_bar = pn.indicators.Progress(name='Progress', value=0, max=100, visible=False, width=620)
         
         # warning
         self.warning = pn.pane.Alert("## Alert\n", alert_type="danger", visible=False, width=620)
-        
-        # curdoc().add_periodic_callback(self._update_frames, 50)
-        # self.thread_update = Thread(target=self._load_video)
         
         # tab settings 
         self._settings()
@@ -134,8 +136,9 @@ class TrackingTab:
     def _yolo_models(self):          
         self.select_model_name = pn.widgets.Select(
             name="Select a YOLO Model",
-            options=self.models_name
-            )
+            options=self.models_name,
+            width=620
+        )
     
     def _models_dir(self):
         self.models_dir = pn.widgets.TextInput(
@@ -181,7 +184,8 @@ class TrackingTab:
             name="Upload video",
             accept=".mp4, .mov, .avi, .mkv",
             multiple=False,
-            height=40
+            height=40,
+            width=620
             )
         
     def _buttons(self):        
@@ -228,9 +232,10 @@ class TrackingTab:
         self.frame_pane.on_event(Tap, self._poly_annotation)
         self.frame_pane.on_event(Tap, self._circle_annotation)
       
-        # clear roi  
+        # buttons  
         self.button_clear_roi.on_click(self._clear_roi)
-        self.button_save_roi_json.on_click(self.to_json)
+        self.button_save_roi_json.on_click(self._to_json)
+        self.button_start_tracking.on_click(self._start_tracking)
     
     # ROI Functions---------------------------------------------------------------------------------------------------
     def _bb_pan_start(self, event):      
@@ -401,7 +406,16 @@ class TrackingTab:
             print(f"Error {e}")
                     
     # Video Functions-------------------------------------------------------------------------------------------------
+    def _bokeh_format(self, img):
+        img = Image.fromarray(img)
+        img_array = np.array(img.transpose(Image.FLIP_TOP_BOTTOM).convert("RGBA"))
+        imview = img_array.view(np.uint32).reshape(img_array.shape[:2])
+        
+        return imview
+    
     def _load_video(self, event):
+        self.video_loaded = False
+        
         mime_to_ext = {
             "video/mp4" : ".mp4",
             "video/avi" : ".avi"
@@ -420,12 +434,10 @@ class TrackingTab:
                 self.video_loaded = True
             except Exception as e:
                 print(f"Error {e}")
-                self.video_loaded = False
                 return
 
             # only happens if the temp_file is created successfully
             if self.video_loaded:
-                # self._collect_frames()
                 self._calculate_background()
         
     def _calculate_background(self):
@@ -512,34 +524,66 @@ class TrackingTab:
             cv.imwrite("background.png", background)
             
             # Convert to bokeh format
-            frame_pil = Image.fromarray(background)
-            frame_array = np.array(frame_pil.transpose(Image.FLIP_TOP_BOTTOM).convert("RGBA"))
-            self.frame_view = frame_array.view(np.uint32).reshape(frame_array.shape[:2])
+            # frame_pil = Image.fromarray(background)
+            # frame_array = np.array(frame_pil.transpose(Image.FLIP_TOP_BOTTOM).convert("RGBA"))
+            # self.frame_view = frame_array.view(np.uint32).reshape(frame_array.shape[:2])
             
+            self.frame_view = self._bokeh_format(background)
             self.current_frame = self.frame_pane.image_rgba(image=[self.frame_view], x=0, y=0, dw=width, dh=height)
             # self.current_frame.data_source.data["image"] = [self.frame_view]
             
         except Exception as e:
             print(f"Background calculation error: {e}")       
-    #-----------------------------------------------------------------------------------------------------------------
     
+    # Tracking--------------------------------------------------------------------------------------------------------
+    def _start_tracking(self, event):
+        self.callback_tracking = pn.state.add_periodic_callback(self._show_tracking_frame, 1)
+            
+    def _show_tracking_frame(self):        
+        try:
+            cap = cv.VideoCapture(self.tmp_file)
+            
+            for _ in range(self.frame_count-1):
+                cap.grab()
+
+            ret, frame = cap.read()
+            
+            if not ret :
+                print("done or fail")
+                self.callback_tracking.stop()
+                return
+        
+            self.frame_count += 1
+            
+            self.frame_view = self._bokeh_format(frame)
+            self.current_frame.data_source.data["image"] = [self.frame_view]
+            
+        except Exception as e:
+            print(f"Error in showing frame: {e}")
+            
+        
+        
+    
+    #-----------------------------------------------------------------------------------------------------------------
     def _hide_warning(self):
         self.warning.visible = False
         
     #-----------------------------------------------------------------------------------------------------------------
 
-    def to_json(self, event):
+    def _to_json(self, event):
         export_tracking_data(self.rois, self.roi_count, self.frame_pane.height, self.frame_pane.width)
     
     def get_panel(self):
         return pn.Column(pn.Row(pn.pane.Markdown("## Tracking\nTracking analysis tools will appear here.")), 
                          pn.Spacer(height=10),
-                         pn.pane.Markdown("### ⚙️Settings") ,
+                         pn.pane.Markdown("### ⚙️ YOLO Settings") ,
                          self.models_dir,
-                         pn.Row(pn.Column(self.select_model_name,  self.slider_confidence, self.file_input), pn.Column(self.select_experiment_type, self.slider_iou)),
+                         self.select_model_name,
+                         pn.Row(self.slider_confidence, self.slider_iou),
+                         self.file_input,
                          pn.Spacer(height=20),
-                         pn.pane.Markdown("### ROI Configuration"),
-                         self.select_roi,
+                         pn.pane.Markdown("### 🐁 Experiment Settings"),
+                         pn.Row(self.select_experiment_type, self.select_roi),
                          pn.Spacer(height=5),
                          pn.Row(self.button_start_tracking, pn.Spacer(width=10), self.button_clear_roi, pn.Spacer(width=10), self.button_save_roi_json),
                          pn.Spacer(height=5),
