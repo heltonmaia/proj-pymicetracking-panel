@@ -9,6 +9,11 @@ from PIL import Image
 import numpy as np
 import cv2 as cv
 
+from torch import cuda
+from torch.backends import mps
+from ultralytics import YOLO
+
+from tracking_tab.processing.tracking import create_roi_mask, process_frame, draw_rois
 from tracking_tab.export import export_tracking_data
 from threading import Thread, Timer
 import math
@@ -18,9 +23,10 @@ import os
 # debug
 from pprint import pprint
 
-MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models')
+MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'assets')
 YOLO_RESOLUTION = (640, 640)
 ROI_TYPES = ["Rectangle", "Polygon", "Circle"]
+
 pn.extension()
 
 class TrackingTab:
@@ -30,7 +36,7 @@ class TrackingTab:
         self.select_experiment_type  = None
         
         # list of models
-        self.models_name= ["Default"]
+        self.models_name= ["Default.pt"]
         
         # slider
         self.slider_confidence = None
@@ -42,6 +48,9 @@ class TrackingTab:
         # models dir
         self.models_dir = None
         
+        # yolo model
+        self.yolo_model = None
+        
         # buttons
         self.button_start_tracking = None
         self.button_clear_roi = None
@@ -50,7 +59,6 @@ class TrackingTab:
         # frames
         self.current_frame = np.ones(YOLO_RESOLUTION, dtype=np.uint8) * 240
         # cv.putText(self.current_frame, "No video available yet!", (240, 200), cv.FONT_HERSHEY_COMPLEX_SMALL, 1, (0,0,0), 1)
-        self.frame_count = 0
         
         # store rois
         self.rois = []
@@ -73,24 +81,33 @@ class TrackingTab:
         
         # video
         self.video_loaded = False
+        self.background = None
         
         # tracking 
         self.callback_tracking = None
-        # pn.state.add_periodic_callback(self._start_tracking, 50)
-        # self.callback_tracking.stop()
-        
+    
+        self.tracking_log = pn.pane.Markdown("", visible=False)
+        self.frame_count = 0
+        self.no_detection_count = 0
+        self.yolo_detections = 0
+        self.template_detections = 0
+        self.mask = None
+            
         # progress bar
         self.progress_bar = pn.indicators.Progress(name='Progress', value=0, max=100, visible=False, width=620)
         
         # warning
         self.warning = pn.pane.Alert("## Alert\n", alert_type="danger", visible=False, width=620)
         
+        # device
+        self.device = None
+        
         # tab settings 
         self._settings()
                 
     def _settings(self):
         # selects
-        self._yolo_models()
+        self._yolo_models_select()
         self._experiment_type()
         self._select_roi()
         
@@ -130,10 +147,18 @@ class TrackingTab:
         self.current_frame = self.frame_pane.image_rgba(image=[self.imview], x=0, y=0, dw=640, dh=640)
         self.frame_view = None
                 
+        # checking device
+        if cuda.is_available():
+            self.device = "cuda"
+        elif mps.is_available():
+            self.device = "mps"
+        else:
+            self.device = "cpu"
+        
         # connect functions
         self._connect_events()
       
-    def _yolo_models(self):          
+    def _yolo_models_select(self):          
         self.select_model_name = pn.widgets.Select(
             name="Select a YOLO Model",
             options=self.models_name,
@@ -219,8 +244,8 @@ class TrackingTab:
         self.hide_warning.start()
         
     def _connect_events(self):
-        # load models
-        self.models_dir.param.watch(lambda event: self._load_models(event.new), 'value')
+        # update models list
+        self.models_dir.param.watch(lambda event: self._update_select_models(event.new), 'value')
         
         # load video
         self.file_input.param.watch(lambda event: self._load_video(event.new), 'value')
@@ -236,7 +261,7 @@ class TrackingTab:
         self.button_clear_roi.on_click(self._clear_roi)
         self.button_save_roi_json.on_click(self._to_json)
         self.button_start_tracking.on_click(self._start_tracking)
-    
+            
     # ROI Functions---------------------------------------------------------------------------------------------------
     def _bb_pan_start(self, event):      
         if self.select_roi.value == "Rectangle":  
@@ -385,9 +410,9 @@ class TrackingTab:
             
         except Exception as e:
             print(f"Error {e}")        
-    #-----------------------------------------------------------------------------------------------------------------
+    # YOLO Models-----------------------------------------------------------------------------------------------------
     
-    def _load_models(self, event):
+    def _update_select_models(self, event):
         try:
             dir = os.listdir(event)
             self.models_name = []
@@ -404,7 +429,17 @@ class TrackingTab:
         except Exception as e:
             self.select_model_name.option = ["None"]
             print(f"Error {e}")
-                    
+             
+    def _load_model(self):
+       try:
+           dir = os.path.join(self.models_dir.value, self.select_model_name.value)
+           
+           self.yolo_model = YOLO(dir)
+           print(f"{dir} load successfully")
+
+       except Exception as e:
+           print(f"Model loading error {e}")
+               
     # Video Functions-------------------------------------------------------------------------------------------------
     def _bokeh_format(self, img):
         img = Image.fromarray(img)
@@ -518,17 +553,17 @@ class TrackingTab:
                 return
 
             # Calculate the average (approximating median for efficiency)
-            background = (median_accumulator / frame_count).astype(np.uint8)
+            self.background = (median_accumulator / frame_count).astype(np.uint8)
 
             # Save the background image
-            cv.imwrite("background.png", background)
+            cv.imwrite("background.png", self.background)
             
             # Convert to bokeh format
             # frame_pil = Image.fromarray(background)
             # frame_array = np.array(frame_pil.transpose(Image.FLIP_TOP_BOTTOM).convert("RGBA"))
             # self.frame_view = frame_array.view(np.uint32).reshape(frame_array.shape[:2])
             
-            self.frame_view = self._bokeh_format(background)
+            self.frame_view = self._bokeh_format(self.background)
             self.current_frame = self.frame_pane.image_rgba(image=[self.frame_view], x=0, y=0, dw=width, dh=height)
             # self.current_frame.data_source.data["image"] = [self.frame_view]
             
@@ -537,7 +572,15 @@ class TrackingTab:
     
     # Tracking--------------------------------------------------------------------------------------------------------
     def _start_tracking(self, event):
-        self.callback_tracking = pn.state.add_periodic_callback(self._show_tracking_frame, 1)
+        self._load_model()
+     
+        shape = (self.frame_pane.height, self.frame_pane.width)
+     
+        self.mask = create_roi_mask(rois=self.rois, frame_shape=shape)
+        
+        if self.yolo_model is not None:
+            self.tracking_log.visible = True
+            self.callback_tracking = pn.state.add_periodic_callback(self._show_tracking_frame, 33)
             
     def _show_tracking_frame(self):        
         try:
@@ -549,11 +592,16 @@ class TrackingTab:
             ret, frame = cap.read()
             
             if not ret :
-                print("done or fail")
                 self.callback_tracking.stop()
                 return
         
-            self.frame_count += 1
+            frame = process_frame(frame, self.yolo_model, self.frame_count, self)
+            frame = draw_rois(image=frame, rois=self.rois)
+            # updating variable values 
+            # self.frame_count += 1
+            
+            # update tracking log
+            self._update_tracking_log()
             
             self.frame_view = self._bokeh_format(frame)
             self.current_frame.data_source.data["image"] = [self.frame_view]
@@ -561,8 +609,17 @@ class TrackingTab:
         except Exception as e:
             print(f"Error in showing frame: {e}")
             
+    def _update_tracking_log(self):
+        log_text = f"Device: {self.device}<br/>"
+        log_text += f"Total Frames: {self.frame_count}<br/>"
+        log_text += f"Frames without detection: {self.no_detection_count}<br/>"
+        log_text += f"YOLO detections: {self.yolo_detections}<br/>"
+        log_text += f"Template detections: {self.template_detections}<br/>"
         
-        
+        for index, roi in enumerate(self.rois):
+            log_text += f"Roi {index}: frames<br/>"
+            
+        self.tracking_log.object = log_text
     
     #-----------------------------------------------------------------------------------------------------------------
     def _hide_warning(self):
@@ -590,6 +647,7 @@ class TrackingTab:
                          self.warning,
                          self.progress_bar,
                          self.frame_pane,
+                         self.tracking_log,
                          margin=(10, 0))
                          
                              
