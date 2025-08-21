@@ -53,6 +53,7 @@ class TrackingTab:
         
         # buttons
         self.button_start_tracking = None
+        self.button_stop_tracking = None
         self.button_clear_roi = None
         self.button_save_roi_json = None
         
@@ -64,6 +65,7 @@ class TrackingTab:
         self.rois = []
         self.roi_count = 0
         self.select_roi = None
+        self.roi_in_track = None
         
         # roi bounding box 
         self.bounding_box = BoxAnnotation(fill_alpha=0.3, fill_color='red')
@@ -214,14 +216,7 @@ class TrackingTab:
             )
         
     def _buttons(self):        
-        self.button_clear_roi = pn.widgets.Button(
-            name="Clear ROI",
-            button_type='danger',
-            width=120,
-            height=40,
-            disabled=True
-            )
-        
+              
         self.button_start_tracking = pn.widgets.Button(
             name="Start Tracking",
             button_type='success',
@@ -230,6 +225,22 @@ class TrackingTab:
             disabled=True
             )
         
+        self.button_stop_tracking = pn.widgets.Button(
+            name="Stop Tracking",
+            button_type='danger',
+            width=120,
+            height=40,
+            # disabled=True
+            )
+        
+        self.button_clear_roi = pn.widgets.Button(
+            name="Clear ROI",
+            button_type='danger',
+            width=120,
+            height=40,
+            disabled=True
+            )
+         
         self.button_save_roi_json = pn.widgets.Button(
             name="Save ROI JSON",
             button_type='primary',
@@ -237,6 +248,8 @@ class TrackingTab:
             height=40,
             disabled=True
             )
+        
+
     
     def _thread_hide_warning(self):
         # hide warning
@@ -577,12 +590,20 @@ class TrackingTab:
         shape = (self.frame_pane.height, self.frame_pane.width)
      
         self.mask = create_roi_mask(rois=self.rois, frame_shape=shape)
-        
+    
         if self.yolo_model is not None:
+            self.roi_in_track = self.rois
+            self._clear_roi(event)
             self.tracking_log.visible = True
-            self.callback_tracking = pn.state.add_periodic_callback(self._show_tracking_frame, 33)
-            
-    def _show_tracking_frame(self):        
+            self.callback_tracking = pn.state.add_periodic_callback(
+                lambda: self._show_tracking_frame(self.roi_in_track),
+                33)
+    
+    def _stop_tracking(self, event):
+        if self.yolo_model is not None:
+            self.callback_tracking.stop()
+        
+    def _show_tracking_frame(self, rois):        
         try:
             cap = cv.VideoCapture(self.tmp_file)
             
@@ -595,10 +616,12 @@ class TrackingTab:
                 self.callback_tracking.stop()
                 return
         
+            # process frames and update log params
             frame = process_frame(frame, self.yolo_model, self.frame_count, self)
-            frame = draw_rois(image=frame, rois=self.rois)
-            # updating variable values 
-            # self.frame_count += 1
+            
+            # draw rois in image
+            frame = draw_rois(image=frame, rois=rois)
+          
             
             # update tracking log
             self._update_tracking_log()
@@ -642,7 +665,7 @@ class TrackingTab:
                          pn.pane.Markdown("### 🐁 Experiment Settings"),
                          pn.Row(self.select_experiment_type, self.select_roi),
                          pn.Spacer(height=5),
-                         pn.Row(self.button_start_tracking, pn.Spacer(width=10), self.button_clear_roi, pn.Spacer(width=10), self.button_save_roi_json),
+                         pn.Row(self.button_start_tracking, pn.Spacer(width=10), self.button_stop_tracking , pn.Spacer(width=10), self.button_clear_roi, pn.Spacer(width=10), self.button_save_roi_json),
                          pn.Spacer(height=5),
                          self.warning,
                          self.progress_bar,

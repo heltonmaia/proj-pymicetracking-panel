@@ -17,6 +17,9 @@ COLORS = {
     "template_mask": (0, 255, 0),  # Green (Template detection)
     "template_centroid": (255, 0, 255),  # Purple (Template centroid)
     "text": (255, 255, 255),  # White
+    "roi_rectangle": (0, 0, 105), # Dark red
+    "roi_circle": (0, 255, 0),
+    "roi_polygon": (100,0,0),
 }
 
 def get_current_roi(point_inside_roi: list[bool]) -> int:
@@ -75,18 +78,17 @@ def draw_rois(image: np.ndarray, rois: list):
     for roi in rois:
         if str(type(roi)) == "<class 'bokeh.models.annotations.geometry.BoxAnnotation'>":
             x0, y0, x1, y1 = list(map(int, [roi.left, height-roi.top, roi.right, height-roi.bottom]))
-            cv.rectangle(image, (x0, y0), (x1, y1), COLORS["template_centroid"], 5)
+            cv.rectangle(image, (x0, y0), (x1, y1), COLORS["roi_rectangle"], 2)
 
         elif str(type(roi)) == "<class 'bokeh.models.renderers.glyph_renderer.GlyphRenderer'>":  
-            # print(roi.glyph.radius)          
-            cv.circle(image, center=(int(roi.glyph.x), height-int(roi.glyph.y)), radius=int(roi.glyph.radius), color=COLORS["template_centroid"], thickness=5)
+            cv.circle(image, (int(roi.glyph.x), height-int(roi.glyph.y)), int(roi.glyph.radius), COLORS["roi_cirlce"], 2)
     
         elif str(type(roi)) == "<class 'bokeh.models.annotations.geometry.PolyAnnotation'>":
             fixed_ys = [height-i for i in roi.ys]
         
             pts = np.array(list(zip(map(int, roi.xs), map(int, fixed_ys))), np.int32)
             pts = pts.reshape((-1,1,2))
-            cv.polylines(image, [pts], True, (0,255,255), 5)
+            cv.polylines(image, [pts], True, COLORS["roi_polygon"], 2)
 
     return image
 
