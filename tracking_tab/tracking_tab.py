@@ -66,6 +66,7 @@ class TrackingTab:
         self.roi_count = 0
         self.select_roi = None
         self.roi_in_track = None
+        self.frame_per_roi = []
         
         # roi bounding box 
         self.bounding_box = BoxAnnotation(fill_alpha=0.3, fill_color='red')
@@ -89,6 +90,8 @@ class TrackingTab:
         self.callback_tracking = None
     
         self.tracking_log = pn.pane.Markdown("", visible=False)
+        self.tracking_data = []
+        self.frame_per_roi = []
         self.frame_count = 0
         self.no_detection_count = 0
         self.yolo_detections = 0
@@ -104,6 +107,9 @@ class TrackingTab:
         # device
         self.device = None
         
+        # cleanup session
+        pn.state.on_session_destroyed(self._cleanup_session)
+
         # tab settings 
         self._settings()
                 
@@ -230,7 +236,7 @@ class TrackingTab:
             button_type='danger',
             width=120,
             height=40,
-            # disabled=True
+            disabled=True
             )
         
         self.button_clear_roi = pn.widgets.Button(
@@ -249,7 +255,11 @@ class TrackingTab:
             disabled=True
             )
         
-
+    def _cleanup_session(self, session_context):
+        # clear loop
+        if self.callback_tracking is not None:
+            self.callback_tracking.stop() 
+            self.callback_tracking = None
     
     def _thread_hide_warning(self):
         # hide warning
@@ -274,6 +284,7 @@ class TrackingTab:
         self.button_clear_roi.on_click(self._clear_roi)
         self.button_save_roi_json.on_click(self._to_json)
         self.button_start_tracking.on_click(self._start_tracking)
+        self.button_stop_tracking.on_click(self._stop_tracking)
             
     # ROI Functions---------------------------------------------------------------------------------------------------
     def _bb_pan_start(self, event):      
@@ -300,6 +311,7 @@ class TrackingTab:
         if self.video_loaded and self.select_roi.value == "Rectangle":       
             aux_box =  BoxAnnotation(top_units="data", bottom_units="data", left_units="data", right_units="data", fill_alpha=0.3, fill_color="red", top=self.bounding_box.top, bottom=self.bounding_box.bottom, right=self.bounding_box.right, left=self.bounding_box.left)   
             self.rois.append(aux_box)
+            self.frame_per_roi.append(0)
             
             self.frame_pane.add_layout(aux_box)        
             
@@ -346,6 +358,7 @@ class TrackingTab:
                 
                 # send the points and reset poly_annotations
                 self.rois.append(polygon)
+                self.frame_per_roi.append(0)
                 self.roi_count += 1
                 
                 self.poly_annotation_points_x, self.poly_annotation_points_y = [], []
@@ -381,6 +394,7 @@ class TrackingTab:
                     
                     circle_draw = self.frame_pane.circle(x=x0, y=y0, radius=radius, radius_units='screen', color="green", alpha=0.3)
                     self.rois.append(circle_draw)
+                    self.frame_per_roi.append(0)
                     self.roi_count += 1
                     
                     # clear dots storage
@@ -551,6 +565,7 @@ class TrackingTab:
                 self.warning.visible = False
                 
                 # update progress bar value
+                self.progress_bar.name="Loading video background..."
                 self.progress_bar.value = int(current_frame/total_frames * 100)
                                 
                 # Move to next frame to sample
@@ -585,53 +600,72 @@ class TrackingTab:
     
     # Tracking--------------------------------------------------------------------------------------------------------
     def _start_tracking(self, event):
-        self._load_model()
+        
+        if self.yolo_model is None:
+            self.progress_bar.name="Loading YOLO model..."
+            self.progress_bar.visible = True
+            self.progress_bar.value = -1
+            self._load_model()
+               
+            shape = (self.frame_pane.height, self.frame_pane.width)
      
-        shape = (self.frame_pane.height, self.frame_pane.width)
-     
-        self.mask = create_roi_mask(rois=self.rois, frame_shape=shape)
+            self.mask = create_roi_mask(rois=self.rois, frame_shape=shape)
     
         if self.yolo_model is not None:
-            self.roi_in_track = self.rois
+            self.progress_bar.name = ""
+            self.progress_bar.visible = False
+            self.button_stop_tracking.disabled = False
+            
+            if self.roi_in_track != self.rois and len(self.rois) > 0:
+                self.roi_in_track = self.rois
+                
             self._clear_roi(event)
             self.tracking_log.visible = True
+            
             self.callback_tracking = pn.state.add_periodic_callback(
-                lambda: self._show_tracking_frame(self.roi_in_track),
+                lambda: self._capture_tracking_frame(self.roi_in_track),
                 33)
     
     def _stop_tracking(self, event):
+        self.button_stop_tracking.disabled = True
+        self.button_start_tracking.disabled = False
+        # self.button_clear_roi.disabled = False
+        self.button_save_roi_json.disabled = False
+        
         if self.yolo_model is not None:
             self.callback_tracking.stop()
-        
-    def _show_tracking_frame(self, rois):        
+     
+    def _capture_tracking_frame(self, rois):
         try:
             cap = cv.VideoCapture(self.tmp_file)
-            
+       
             for _ in range(self.frame_count-1):
                 cap.grab()
-
+                
             ret, frame = cap.read()
-            
+        
             if not ret :
                 self.callback_tracking.stop()
-                return
-        
+                return        
+            
             # process frames and update log params
             frame = process_frame(frame, self.yolo_model, self.frame_count, self)
             
             # draw rois in image
             frame = draw_rois(image=frame, rois=rois)
-          
+        
             
             # update tracking log
             self._update_tracking_log()
             
-            self.frame_view = self._bokeh_format(frame)
-            self.current_frame.data_source.data["image"] = [self.frame_view]
-            
+            self.frame_view = self._bokeh_format(frame)  
+            self.current_frame.data_source.data["image"] = [self.frame_view]              
+        
         except Exception as e:
-            print(f"Error in showing frame: {e}")
-            
+            print(f"Error in capturing frame: {e}")
+            self.callback_tracking.stop()
+
+                   
     def _update_tracking_log(self):
         log_text = f"Device: {self.device}<br/>"
         log_text += f"Total Frames: {self.frame_count}<br/>"
@@ -639,8 +673,13 @@ class TrackingTab:
         log_text += f"YOLO detections: {self.yolo_detections}<br/>"
         log_text += f"Template detections: {self.template_detections}<br/>"
         
-        for index, roi in enumerate(self.rois):
-            log_text += f"Roi {index}: frames<br/>"
+        for index, roi in enumerate(self.roi_in_track):
+            log_text += f"Roi {index}: {self.frame_per_roi[index]} frames<br/>"
+        
+        log_text += f'Centroid X: {self.tracking_data[self.frame_count-1]["centroid_x"]}<br/>'
+        log_text += f'Centroid Y: {self.tracking_data[self.frame_count-1]["centroid_y"]}<br/>'
+        # log_text += f'{self.tracking_data[self.frame_count-1]["roi"]}<br>'
+        log_text += f'{self.frame_per_roi}<br>'
             
         self.tracking_log.object = log_text
     

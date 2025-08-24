@@ -9,6 +9,7 @@ import numpy as np
 import torch
 from ultralytics import YOLO
 
+from shapely.geometry import Point, Polygon
 from .detection import calculate_centroid, template_matching
 
 COLORS = {
@@ -22,23 +23,34 @@ COLORS = {
     "roi_polygon": (100,0,0),
 }
 
-def get_current_roi(point_inside_roi: list[bool]) -> int:
+def get_current_roi(params, rois: list, frame_height, centroid_x, centroid_y):
     """
-    Determine the current ROI based on a list of boolean values indicating
-    if a point is inside each ROI.
-
-    Args:
-        point_inside_roi (list[bool]): List of boolean values indicating
-        if a point is inside each ROI.
-
-    Returns:
-        int: Index of the current ROI (1-based index) or None if no ROI is active.
+    
     """
-    true_indices = [idx for idx, val in enumerate(point_inside_roi, 1) if val]
-    if not true_indices:
-        return None
-    return true_indices[1] if len(true_indices) > 1 else true_indices[0]
+    centroid = Point(centroid_x, centroid_y)
+    print(rois)
+    for index, roi in enumerate(rois): 
+        if str(type(roi)) == "<class 'bokeh.models.annotations.geometry.BoxAnnotation'>":
+            x0, y0, x1, y1 = list(map(int, [roi.left, frame_height-roi.top, roi.right, frame_height-roi.bottom]))
+            rectangle = Polygon([(x0, y0), (x0, y1), (x1, y0), (x1, y1)])
+            
+            if rectangle.contains(centroid):
+                print("rect in track .py")
+                params.frame_per_roi[index] += 1
+            
+        elif str(type(roi)) == "<class 'bokeh.models.renderers.glyph_renderer.GlyphRenderer'>":  
+            center = Point(int(roi.glyph.x), frame_height-int(roi.glyph.y))
+            circle = center.buffer(int(roi.glyph.radius))
+    
+            if circle.contains(centroid):
+                params.frame_per_roi[index] += 1
 
+        elif str(type(roi)) == "<class 'bokeh.models.annotations.geometry.PolyAnnotation'>":
+            fixed_ys = [frame_height-i for i in roi.ys]
+            
+            pts = np.array(list(zip(map(int, roi.xs), map(int, fixed_ys))), np.int32)
+            print(pts)     
+    
 def create_roi_mask(rois: list, frame_shape: tuple[int, int]) -> np.ndarray:
     """
     Cria uma máscara binária a partir dos ROIs definidos.
@@ -72,7 +84,6 @@ def create_roi_mask(rois: list, frame_shape: tuple[int, int]) -> np.ndarray:
     return mask
 
 def draw_rois(image: np.ndarray, rois: list):
-    # thicknesses = [3] * len(rois) if thicknesses is None else thicknesses
     height, _, _ = image.shape
 
     for roi in rois:
@@ -81,7 +92,7 @@ def draw_rois(image: np.ndarray, rois: list):
             cv.rectangle(image, (x0, y0), (x1, y1), COLORS["roi_rectangle"], 2)
 
         elif str(type(roi)) == "<class 'bokeh.models.renderers.glyph_renderer.GlyphRenderer'>":  
-            cv.circle(image, (int(roi.glyph.x), height-int(roi.glyph.y)), int(roi.glyph.radius), COLORS["roi_cirlce"], 2)
+            cv.circle(image, (int(roi.glyph.x), height-int(roi.glyph.y)), int(roi.glyph.radius), COLORS["roi_circle"], 2)
     
         elif str(type(roi)) == "<class 'bokeh.models.annotations.geometry.PolyAnnotation'>":
             fixed_ys = [height-i for i in roi.ys]
@@ -198,34 +209,19 @@ def process_frame(frame: np.ndarray, model: YOLO, frame_num: int, params) -> np.
                 cv.circle(overlay, centroid, 4, COLORS["template_centroid"], -1)
 
         # Check if centroid is in any ROI
-        # if centroid:
-        #     current_roi = get_current_roi(
-        #         [roi.contains_point(centroid) for roi in st.session_state.rois]
-        #     )
-
-        #     st.session_state.roi_counts[current_roi] += 1
-        #     st.session_state.current_roi = current_roi
-        #     frame_data["roi"] = current_roi
-
+        # print(f"Centroid: {centroid}")
+        if centroid:            
+            get_current_roi(params, params.rois, frame_height, frame_data["centroid_x"], frame_data["centroid_y"])
+            # frame_data["roi"] = current_roi
+            # params.frame_per_roi[current_roi] += 1
+            
         # Update no detection counter
         if not detection_made:
             params.no_detection_count += 1
             frame_data["detection_method"] = "None"
 
-        # Draw ROIs
-        # thicknesses = [
-        #     3 if current_roi == idx else 1
-        #     for idx in range(1, len(params.rois) + 1)
-        # ]
-        # draw_rois(
-        #     overlay,
-        #     st.session_state.experiment_type,
-        #     st.session_state.rois,
-        #     thicknesses,
-        # )
-
         # Add frame data to tracking data
-        # st.session_state.tracking_data.append(frame_data)
+        params.tracking_data.append(frame_data)
         params.frame_count += 1
 
         return overlay
