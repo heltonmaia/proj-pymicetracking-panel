@@ -14,7 +14,8 @@ from torch.backends import mps
 from ultralytics import YOLO
 
 from tracking_tab.processing.tracking import create_roi_mask, process_frame, draw_rois
-from tracking_tab.export import export_tracking_data
+from tracking_tab.export_roi import export_roi_data
+from tracking_tab.export_json import export_tracking_data, create_download_filename
 from threading import Thread, Timer
 import math
 import io
@@ -56,6 +57,7 @@ class TrackingTab:
         self.button_stop_tracking = None
         self.button_clear_roi = None
         self.button_save_roi_json = None
+        self.button_download_json = None
         
         # frames
         self.current_frame = np.ones(YOLO_RESOLUTION, dtype=np.uint8) * 240
@@ -255,6 +257,14 @@ class TrackingTab:
             disabled=True
             )
         
+        self.button_download_json = pn.widgets.Button(
+            name="Download JSON",
+            button_type='success',
+            width=120,
+            height=40,
+            disabled=True
+            )
+        
     def _cleanup_session(self, session_context):
         # clear loop
         if self.callback_tracking is not None:
@@ -282,9 +292,10 @@ class TrackingTab:
       
         # buttons  
         self.button_clear_roi.on_click(self._clear_roi)
-        self.button_save_roi_json.on_click(self._to_json)
+        self.button_save_roi_json.on_click(self._rois_to_json)
         self.button_start_tracking.on_click(self._start_tracking)
         self.button_stop_tracking.on_click(self._stop_tracking)
+        self.button_download_json.on_click(self._download_json)
             
     # ROI Functions---------------------------------------------------------------------------------------------------
     def _bb_pan_start(self, event):      
@@ -644,7 +655,8 @@ class TrackingTab:
                 
             ret, frame = cap.read()
         
-            if not ret :
+            if not ret:
+                self.button_download_json = False
                 self.callback_tracking.stop()
                 return        
             
@@ -664,8 +676,7 @@ class TrackingTab:
         except Exception as e:
             print(f"Error in capturing frame: {e}")
             self.callback_tracking.stop()
-
-                   
+               
     def _update_tracking_log(self):
         log_text = f"Device: {self.device}<br/>"
         log_text += f"Total Frames: {self.frame_count}<br/>"
@@ -689,8 +700,13 @@ class TrackingTab:
         
     #-----------------------------------------------------------------------------------------------------------------
 
-    def _to_json(self, event):
-        export_tracking_data(self.rois, self.roi_count, self.frame_pane.height, self.frame_pane.width)
+    def _rois_to_json(self, event):
+        export_roi_data(self.rois, self.roi_count, self.frame_pane.height, self.frame_pane.width)
+    
+    def _download_json(self, event):
+        filename = create_download_filename(self.file_input.filename)
+        export_tracking_data(filename, self.experiment_type.value, self.frame_count, self.no_detection_count, self.yolo_detections, self.template_detections,
+                             self.roi, self.roi_count, self.tracking_data)
     
     def get_panel(self):
         return pn.Column(pn.Row(pn.pane.Markdown("## Tracking\nTracking analysis tools will appear here.")), 
@@ -709,6 +725,7 @@ class TrackingTab:
                          self.warning,
                          self.progress_bar,
                          self.frame_pane,
+                         self.button_download_json,
                          self.tracking_log,
                          margin=(10, 0))
                          

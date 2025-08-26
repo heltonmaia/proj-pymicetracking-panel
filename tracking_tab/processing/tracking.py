@@ -49,7 +49,7 @@ def get_current_roi(params, rois: list, frame_height, centroid_x, centroid_y):
             fixed_ys = [frame_height-i for i in roi.ys]
             
             pts = np.array(list(zip(map(int, roi.xs), map(int, fixed_ys))), np.int32)
-            print(pts)     
+                
     
 def create_roi_mask(rois: list, frame_shape: tuple[int, int]) -> np.ndarray:
     """
@@ -211,7 +211,7 @@ def process_frame(frame: np.ndarray, model: YOLO, frame_num: int, params) -> np.
         # Check if centroid is in any ROI
         # print(f"Centroid: {centroid}")
         if centroid:            
-            get_current_roi(params, params.rois, frame_height, frame_data["centroid_x"], frame_data["centroid_y"])
+            get_current_roi(params, params.roi_in_track, frame_height, frame_data["centroid_x"], frame_data["centroid_y"])
             # frame_data["roi"] = current_roi
             # params.frame_per_roi[current_roi] += 1
             

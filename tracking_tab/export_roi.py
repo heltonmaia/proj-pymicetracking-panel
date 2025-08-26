@@ -7,7 +7,7 @@ from bokeh.models import BoxAnnotation, PolyAnnotation, Circle
 # debug
 from pprint import pprint
 
-def export_tracking_data(rois, roi_count, image_height, image_width):
+def export_roi_data(rois, roi_count, image_height, image_width):
     json_list = []
     
     json_dict = {
