@@ -28,6 +28,8 @@ experiments/
 *.avi
 *.mov
 *.mkv
+*.png
+*.jpg
 
 # Logs
 *.log
