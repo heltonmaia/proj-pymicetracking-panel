@@ -6,7 +6,23 @@ import traceback
 
 import cv2 as cv
 import numpy as np
-import torch
+# Try to import with GPU support, fallback to CPU
+try:
+    import torch
+    GPU_TORCH_AVAILABLE = True
+except ImportError:
+    # Mock for CPU-only mode
+    class torch:
+        @staticmethod
+        def no_grad():
+            class NoGradContext:
+                def __enter__(self):
+                    return self
+                def __exit__(self, *args):
+                    pass
+            return NoGradContext()
+    GPU_TORCH_AVAILABLE = False
+
 from ultralytics import YOLO
 
 from shapely.geometry import Point, Polygon
@@ -23,27 +39,60 @@ COLORS = {
     "roi_polygon": (100,0,0),
 }
 
-def get_current_roi(params, rois: list, frame_height, centroid_x, centroid_y):
+def get_current_roi(params, rois: list, frame_height, centroid_x, centroid_y, circle_data: dict = None):
     """
     
     """
     centroid = Point(centroid_x, centroid_y)
-    print(rois)
+    
+    # Ensure frame_per_roi has enough elements
+    while len(params.frame_per_roi) <= len(rois):
+        params.frame_per_roi.append(0)
+    
     for index, roi in enumerate(rois): 
         if str(type(roi)) == "<class 'bokeh.models.annotations.geometry.BoxAnnotation'>":
             x0, y0, x1, y1 = list(map(int, [roi.left, frame_height-roi.top, roi.right, frame_height-roi.bottom]))
             rectangle = Polygon([(x0, y0), (x0, y1), (x1, y0), (x1, y1)])
             
             if rectangle.contains(centroid):
-                print("rect in track .py")
-                params.frame_per_roi[index] += 1
+                # Additional bounds check
+                if index < len(params.frame_per_roi):
+                    params.frame_per_roi[index] += 1
             
         elif str(type(roi)) == "<class 'bokeh.models.renderers.glyph_renderer.GlyphRenderer'>":  
-            center = Point(int(roi.glyph.x), frame_height-int(roi.glyph.y))
-            circle = center.buffer(int(roi.glyph.radius))
+            # Handle new scatter-based circles
+            try:
+                # Use saved circle data if available
+                roi_id = id(roi)
+                if circle_data and roi_id in circle_data:
+                    data = circle_data[roi_id]
+                    center_x = data['center_x']
+                    center_y = data['center_y']
+                    radius = data['radius']
+                elif 'x' in roi.data_source.data and 'y' in roi.data_source.data:
+                    center_x = roi.data_source.data['x'][0]
+                    center_y = roi.data_source.data['y'][0]
+                    # For scatter circles, size is diameter, so radius = size/2
+                    if 'size' in roi.data_source.data:
+                        radius = roi.data_source.data['size'][0] / 2
+                    else:
+                        radius = 10  # default radius
+                else:
+                    # Fallback to old format
+                    center_x = int(roi.glyph.x)
+                    center_y = int(roi.glyph.y)
+                    radius = int(roi.glyph.radius)
+                    
+                center = Point(center_x, frame_height - center_y)
+                circle = center.buffer(radius)
+            except (AttributeError, KeyError, ValueError, TypeError) as e:
+                print(f"Error processing circle ROI: {e}")
+                continue
     
             if circle.contains(centroid):
-                params.frame_per_roi[index] += 1
+                # Additional bounds check
+                if index < len(params.frame_per_roi):
+                    params.frame_per_roi[index] += 1
 
         elif str(type(roi)) == "<class 'bokeh.models.annotations.geometry.PolyAnnotation'>":
             fixed_ys = [frame_height-i for i in roi.ys]
@@ -83,7 +132,7 @@ def create_roi_mask(rois: list, frame_shape: tuple[int, int]) -> np.ndarray:
 
     return mask
 
-def draw_rois(image: np.ndarray, rois: list):
+def draw_rois(image: np.ndarray, rois: list, circle_data: dict = None):
     height, _, _ = image.shape
 
     for roi in rois:
@@ -92,7 +141,39 @@ def draw_rois(image: np.ndarray, rois: list):
             cv.rectangle(image, (x0, y0), (x1, y1), COLORS["roi_rectangle"], 2)
 
         elif str(type(roi)) == "<class 'bokeh.models.renderers.glyph_renderer.GlyphRenderer'>":  
-            cv.circle(image, (int(roi.glyph.x), height-int(roi.glyph.y)), int(roi.glyph.radius), COLORS["roi_circle"], 2)
+            try:
+                # Use the saved circle data if available
+                roi_id = id(roi)
+                if circle_data and roi_id in circle_data:
+                    # Use the exact values saved during circle creation
+                    data = circle_data[roi_id]
+                    center_x = int(data['center_x'])
+                    center_y = int(data['center_y'])
+                    radius = int(data['radius'])
+                    
+                elif 'x' in roi.data_source.data and 'y' in roi.data_source.data:
+                    # Fallback to data source parsing
+                    center_x = int(roi.data_source.data['x'][0])
+                    center_y = int(roi.data_source.data['y'][0])
+                    if 'size' in roi.data_source.data:
+                        size_value = roi.data_source.data['size'][0]
+                        radius = int(size_value / 2)
+                    else:
+                        radius = 10
+                else:
+                    # Fallback to old format
+                    center_x = int(roi.glyph.x)
+                    center_y = int(roi.glyph.y)
+                    radius = int(roi.glyph.radius)
+                    
+                # Draw circle similar to Bokeh: filled with transparency + outline
+                cv.circle(image, (center_x, height - center_y), radius, COLORS["roi_circle"], 2)
+                # Add slight fill for better visibility (similar to Bokeh alpha=0.3)
+                overlay = image.copy()
+                cv.circle(overlay, (center_x, height - center_y), radius, COLORS["roi_circle"], -1)
+                cv.addWeighted(overlay, 0.1, image, 0.9, 0, image)
+            except (AttributeError, KeyError, ValueError, TypeError) as e:
+                print(f"Error drawing circle ROI: {e}")
     
         elif str(type(roi)) == "<class 'bokeh.models.annotations.geometry.PolyAnnotation'>":
             fixed_ys = [height-i for i in roi.ys]
@@ -132,7 +213,18 @@ def process_frame(frame: np.ndarray, model: YOLO, frame_num: int, params) -> np.
         }
 
         # First try YOLO detection
-        with torch.no_grad():
+        if GPU_TORCH_AVAILABLE:
+            with torch.no_grad():
+                results = model(
+                    frame,
+                    verbose=False,
+                    conf=params.slider_confidence.value,
+                    iou=params.slider_iou.value,
+                    device=params.device,
+                    imgsz=640,
+                )
+        else:
+            # CPU-only mode without torch context
             results = model(
                 frame,
                 verbose=False,
@@ -147,41 +239,53 @@ def process_frame(frame: np.ndarray, model: YOLO, frame_num: int, params) -> np.
                 hasattr(results[0], "masks")
                 and results[0].masks is not None
                 and len(results[0].masks) > 0
+                and hasattr(results[0], "boxes")
+                and results[0].boxes is not None
+                and len(results[0].boxes.conf) > 0
             ):
-                best_idx = np.argmax(results[0].boxes.conf.cpu().numpy())
+                # Ensure we don't access beyond available masks
+                conf_array = results[0].boxes.conf.cpu().numpy()
+                num_masks = len(results[0].masks.data)
+                
+                # Only consider confidences for available masks
+                if len(conf_array) > num_masks:
+                    conf_array = conf_array[:num_masks]
+                
+                if len(conf_array) > 0:
+                    best_idx = np.argmax(conf_array)
+                    
+                    if best_idx < num_masks:
+                        best_mask_tensor = results[0].masks.data[best_idx].cpu()
 
-                if best_idx < len(results[0].masks.data):
-                    best_mask_tensor = results[0].masks.data[best_idx].cpu()
-
-                    best_mask = cv.resize(
-                        best_mask_tensor.numpy(),
-                        (frame_width, frame_height),
-                        interpolation=cv.INTER_NEAREST,
-                    )
-
-                    binary_mask = (best_mask > 0.5).astype(np.uint8)
-                    centroid = calculate_centroid(binary_mask)
-
-                    if centroid:
-                        detection_made = True
-                        params.yolo_detections += 1
-
-                        frame_data.update(
-                            {
-                                "centroid_x": centroid[0],
-                                "centroid_y": centroid[1],
-                                "detection_method": "YOLO",
-                            }
+                        best_mask = cv.resize(
+                            best_mask_tensor.numpy(),
+                            (frame_width, frame_height),
+                            interpolation=cv.INTER_NEAREST,
                         )
 
-                        colored_mask = np.zeros_like(overlay)
-                        if (
-                            binary_mask.shape[0] == colored_mask.shape[0]
-                            and binary_mask.shape[1] == colored_mask.shape[1]
-                        ):
-                            colored_mask[binary_mask > 0] = COLORS["mask"]
-                            overlay = cv.addWeighted(overlay, 0.7, colored_mask, 0.3, 0)
-                            cv.circle(overlay, centroid, 4, COLORS["centroid"], -1)
+                        binary_mask = (best_mask > 0.5).astype(np.uint8)
+                        centroid = calculate_centroid(binary_mask)
+
+                        if centroid:
+                            detection_made = True
+                            params.yolo_detections += 1
+
+                            frame_data.update(
+                                {
+                                    "centroid_x": centroid[0],
+                                    "centroid_y": centroid[1],
+                                    "detection_method": "YOLO",
+                                }
+                            )
+
+                            colored_mask = np.zeros_like(overlay)
+                            if (
+                                binary_mask.shape[0] == colored_mask.shape[0]
+                                and binary_mask.shape[1] == colored_mask.shape[1]
+                            ):
+                                colored_mask[binary_mask > 0] = COLORS["mask"]
+                                overlay = cv.addWeighted(overlay, 0.7, colored_mask, 0.3, 0)
+                                cv.circle(overlay, centroid, 4, COLORS["centroid"], -1)
 
         # If YOLO didn't detect anything, try template matching
         if not detection_made and params.background_frame is not None:
@@ -211,7 +315,7 @@ def process_frame(frame: np.ndarray, model: YOLO, frame_num: int, params) -> np.
         # Check if centroid is in any ROI
         # print(f"Centroid: {centroid}")
         if centroid:            
-            get_current_roi(params, params.roi_in_track, frame_height, frame_data["centroid_x"], frame_data["centroid_y"])
+            get_current_roi(params, params.roi_in_track, frame_height, frame_data["centroid_x"], frame_data["centroid_y"], params.circle_roi_data)
             # frame_data["roi"] = current_roi
             # params.frame_per_roi[current_roi] += 1
             
@@ -226,9 +330,15 @@ def process_frame(frame: np.ndarray, model: YOLO, frame_num: int, params) -> np.
 
         return overlay
 
-    except Exception as e: # consertar para mostrar aviso na tela
-        print(f"Frame {frame_num} error: {str(e)}")
-        print(f"Error details: {type(e).__name__}")
+    except Exception as e:
+        error_msg = f"Frame {frame_num} error: {str(e)}"
+        error_type = f"Error details: {type(e).__name__}"
+        print(error_msg)
+        print(error_type)
         print(traceback.format_exc())
+        
+        # Add error to logs if params has the method
+        if hasattr(params, '_add_log_message'):
+            params._add_log_message(f"{error_msg} ({error_type})", "error")
 
         return frame

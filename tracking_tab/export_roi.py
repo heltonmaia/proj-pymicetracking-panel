@@ -46,11 +46,32 @@ def export_roi_data(rois, roi_count, image_height, image_width):
             })
             
         if str(type(roi)) == "<class 'bokeh.models.renderers.glyph_renderer.GlyphRenderer'>":            
-            json_list.append({
-                "type": "circle",
-                "center": (int(roi.glyph.x), image_height-int(roi.glyph.y)), 
-                "radius": int(roi.glyph.radius)
-            })
+            try:
+                # Use saved values if available
+                if hasattr(roi, 'actual_radius') and hasattr(roi, 'center_x') and hasattr(roi, 'center_y'):
+                    center_x = int(roi.center_x)
+                    center_y = int(roi.center_y)
+                    radius = int(roi.actual_radius)
+                elif 'x' in roi.data_source.data and 'y' in roi.data_source.data:
+                    center_x = int(roi.data_source.data['x'][0])
+                    center_y = int(roi.data_source.data['y'][0])
+                    if 'size' in roi.data_source.data:
+                        radius = int(roi.data_source.data['size'][0] / 2)
+                    else:
+                        radius = 10
+                else:
+                    # Fallback to old format
+                    center_x = int(roi.glyph.x)
+                    center_y = int(roi.glyph.y)
+                    radius = int(roi.glyph.radius)
+                    
+                json_list.append({
+                    "type": "circle",
+                    "center": (center_x, image_height - center_y), 
+                    "radius": radius
+                })
+            except (AttributeError, KeyError, ValueError, TypeError) as e:
+                print(f"Error exporting circle ROI: {e}")
             
     json_dict["rois"] = json_list
     with open("rois.json", "w") as file:

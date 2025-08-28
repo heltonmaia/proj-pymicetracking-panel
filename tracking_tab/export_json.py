@@ -6,6 +6,25 @@ import json
 from datetime import datetime
 from typing import Any, Dict, List
 
+
+def _convert_rois_to_dict(rois: List) -> List[Dict]:
+    """Convert ROI objects to dictionary format"""
+    result = []
+    
+    for roi in rois:
+        try:
+            if hasattr(roi, 'to_dict'):
+                result.append(roi.to_dict())
+            elif hasattr(roi, '__dict__'):
+                result.append(roi.__dict__)
+            else:
+                result.append(str(roi))
+        except Exception as e:
+            print(f"Warning: Could not convert ROI to dict: {e}")
+            result.append({"error": f"Could not convert ROI: {str(e)}"})
+    
+    return result
+
 def export_tracking_data(
     video_name: str,
     experiment_type: str,
@@ -43,7 +62,7 @@ def export_tracking_data(
         "frames_without_detection": frames_without_detection,
         "yolo_detections": yolo_detections,
         "template_detections": template_detections,
-        "rois": [roi.to_dict() for roi in rois],
+        "rois": _convert_rois_to_dict(rois),
         "roi_counts": roi_counts,
         "tracking_data": tracking_data,
     }
