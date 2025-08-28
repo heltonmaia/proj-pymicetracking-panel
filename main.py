@@ -44,7 +44,8 @@ control_tabs = pn.Tabs(
     ('🌐 IRL Analysis', irl_tab),
     ('🧪 Synthetic Data', synthetic_tab),
     ('🛠️ Extra Tools', extra_tools_tab),
-    ('📖 Documentation', documentation_tab)
+    ('📖 Documentation', documentation_tab),
+    active=1  # Set Animal Tracking as default active tab
 )
 
 # Main layout

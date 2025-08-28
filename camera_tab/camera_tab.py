@@ -6,8 +6,10 @@ import base64
 from PIL import Image
 import os
 from datetime import datetime
+from pathlib import Path
+import shutil
 
-EXPERIMENTS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'experiments')
+TEMP_DIR = Path(__file__).parent / 'temp'
 
 class CameraTab:
     def __init__(self):
@@ -19,6 +21,14 @@ class CameraTab:
         self.frame_count = 0
         self.current_frame = None
         self.camera_callback = None
+        
+        # Create temp directory and cleanup
+        self.temp_dir = TEMP_DIR
+        self._cleanup_temp_files()
+        self.temp_dir.mkdir(exist_ok=True)
+        
+        # Store current recording path for download
+        self.current_recording_path = None
 
         # Frame display
         self.frame_pane = pn.pane.HTML(
@@ -58,7 +68,13 @@ class CameraTab:
         self.recording_text = pn.pane.Markdown("**Recording:** ⚪ Stopped")
         self.debug_text = pn.pane.Markdown("**Debug:** Waiting...")
         self.camera_info_text = pn.pane.Markdown("**Camera Info:** -")
-        self.camera_select = pn.widgets.Select(name='📷 Camera:', options=self._get_available_cameras(), width=200)
+        self.camera_select = pn.widgets.Select(name='📷 Camera:', options={"Click 'Detect Cameras' to scan": -1}, width=200)
+        self.detect_cameras_button = pn.widgets.Button(
+            name='🔍 Detect Cameras',
+            button_type='primary',
+            width=150,
+            height=35
+        )
         self.resolution_select = pn.widgets.Select(
             name='📐 Resolution:',
             options={
@@ -69,25 +85,15 @@ class CameraTab:
             },
             value=(640, 480), width=150
         )
-        # Output directory selection
-        self.selected_directory = EXPERIMENTS_DIR
-        self.browse_button = pn.widgets.Button(
-            name='📁 Browse Folder',
-            button_type='primary',
+        # Download functionality - use FileDownload widget
+        self.download_widget = pn.widgets.FileDownload(
+            label='📥 Download Recording',
+            button_type='success',
             width=150,
-            height=35
+            height=40,
+            visible=False
         )
-        self.output_path_display = pn.pane.Markdown(
-            f"**Selected folder:** `{self.selected_directory}`",
-            width=400
-        )
-        self.filename_input = pn.widgets.TextInput(
-            name='',
-            value='recording',
-            placeholder='Enter filename (without extension)',
-            width=250
-        )
-        self.filename_label = pn.pane.Markdown("**📄 Filename:**", width=80, margin=(5, 5))
+        self.recording_info = pn.pane.Markdown("**Recording:** Ready to record", width=400)
         self._connect_events()
 
     def _get_available_cameras(self):
@@ -106,37 +112,29 @@ class CameraTab:
         self.stop_button.on_click(self.stop_camera)
         self.record_button.on_click(self.start_recording)
         self.stop_record_button.on_click(self.stop_recording)
-        self.browse_button.on_click(self.browse_directory)
+        self.detect_cameras_button.on_click(self.detect_cameras)
 
-    def browse_directory(self, event=None):
-        """Open directory browser using tkinter"""
-        try:
-            import tkinter as tk
-            from tkinter import filedialog
-            
-            # Create a temporary root window (hidden)
-            root = tk.Tk()
-            root.withdraw()  # Hide the main window
-            root.attributes('-topmost', True)  # Bring to front
-            
-            # Open directory dialog
-            selected_dir = filedialog.askdirectory(
-                title='Select Output Directory',
-                initialdir=self.selected_directory
-            )
-            
-            # Clean up the temporary window
-            root.destroy()
-            
-            if selected_dir:  # User selected a directory
-                self.selected_directory = selected_dir
-                self.output_path_display.object = f"**Selected folder:** `{self.selected_directory}`"
-            
-        except ImportError:
-            # Fallback if tkinter is not available
-            self.output_path_display.object = "**Error:** tkinter not available. Please install tkinter for directory selection."
-        except Exception as e:
-            self.output_path_display.object = f"**Error:** {str(e)}"
+    def _cleanup_temp_files(self):
+        """Clean up temporary files from previous sessions"""
+        temp_dir = Path(__file__).parent / 'temp'
+        if temp_dir.exists():
+            try:
+                shutil.rmtree(temp_dir)
+                print(f"[CLEANUP] Removed temporary files from: {temp_dir}")
+            except Exception as e:
+                print(f"[CLEANUP] Warning: Could not clean temp directory: {e}")
+
+    def detect_cameras(self, event=None):
+        """Detect available cameras and update the select options"""
+        self.debug_text.object = "**Debug:** 🔍 Scanning for cameras..."
+        cameras = self._get_available_cameras()
+        self.camera_select.options = cameras
+        if cameras and list(cameras.values())[0] != -1:
+            self.camera_select.value = list(cameras.values())[0]
+            self.debug_text.object = f"**Debug:** ✅ Found {len(cameras)} camera(s)"
+        else:
+            self.debug_text.object = "**Debug:** ❌ No cameras detected"
+
 
     def start_camera(self, event=None):
         if self.streaming:
@@ -202,31 +200,26 @@ class CameraTab:
             return
         self.recording = True
         
-        # Ensure output folder exists
-        output_folder = self.selected_directory
-        if not os.path.exists(output_folder):
-            try:
-                os.makedirs(output_folder)
-                self.debug_text.object = f"**Debug:** Folder created: {output_folder}"
-            except Exception as e:
-                self.debug_text.object = f"**Debug:** ❌ Error creating folder: {e}"
-                self.recording = False
-                return
+        # Hide download widget when starting new recording
+        self.download_widget.visible = False
+        
+        # Generate timestamp-based filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"recording_{timestamp}.mp4"
         
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         # Scale video to current camera resolution
         width_cap = int(self.camera.get(cv2.CAP_PROP_FRAME_WIDTH))
         height_cap = int(self.camera.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        # Use only custom filename
-        custom_name = self.filename_input.value.strip() or 'recording'
-        self.temp_video_file = os.path.join(output_folder, f"temp_{custom_name}.mp4")
+        
+        self.temp_video_file = str(self.temp_dir / filename)
         fps = self.camera.get(cv2.CAP_PROP_FPS)
         if fps <= 0:
             fps = 20.0
-        frame_width = int(self.camera.get(cv2.CAP_PROP_FRAME_WIDTH))
-        frame_height = int(self.camera.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            
         self.video_writer = cv2.VideoWriter(self.temp_video_file, fourcc, fps, (width_cap, height_cap))
         self.recording_text.object = "**Recording:** 🔴 Recording..."
+        self.recording_info.object = f"**Recording:** 🔴 Recording {filename}..."
         self.record_button.disabled = True
         self.stop_record_button.disabled = False
 
@@ -237,17 +230,25 @@ class CameraTab:
         if self.video_writer:
             self.video_writer.release()
             self.video_writer = None
+        
         if self.temp_video_file and os.path.exists(self.temp_video_file):
-            # Use only custom filename
-            custom_name = self.filename_input.value.strip() or 'recording'
-            final_filename = f"{custom_name}.mp4"
-            output_folder = self.selected_directory
-            final_filepath = os.path.join(output_folder, final_filename)
-            try:
-                os.rename(self.temp_video_file, final_filepath)
-                self.debug_text.object = f"**Debug:** ✅ Video saved to {final_filepath}"
-            except Exception as e:
-                self.debug_text.object = f"**Debug:** ❌ Error saving video: {e}"
+            # Store recording path for download
+            self.current_recording_path = Path(self.temp_video_file)
+            file_size_mb = self.current_recording_path.stat().st_size / 1024 / 1024
+            
+            self.recording_info.object = f"""**Recording:** ✅ Recording completed!
+**File:** {self.current_recording_path.name} ({file_size_mb:.1f} MB)
+**Location:** Temporary folder (camera_tab/temp)"""
+            
+            # Setup download widget with the recording file
+            self.download_widget.file = str(self.current_recording_path)
+            self.download_widget.filename = self.current_recording_path.name
+            self.download_widget.visible = True
+            self.debug_text.object = f"**Debug:** ✅ Recording ready for download"
+        else:
+            self.recording_info.object = "**Recording:** ❌ Recording failed"
+            self.debug_text.object = f"**Debug:** ❌ Error: Recording file not found"
+            
         self.recording_text.object = "**Recording:** ⚪ Stopped"
         self.record_button.disabled = False
         self.stop_record_button.disabled = True
@@ -291,24 +292,19 @@ class CameraTab:
             print(f"Error in conversion: {e}")
             return None
 
+
     def get_panel(self):
         return pn.Column(
             pn.Row(
-                self.camera_select, 
-                pn.Spacer(width=20), 
+                pn.Column(
+                    self.camera_select,
+                    pn.Spacer(height=5),
+                    self.detect_cameras_button
+                ),
+                pn.Spacer(width=40), 
                 self.resolution_select,
                 align='start'
             ),
-            pn.Spacer(height=15),
-            pn.Row(
-                self.browse_button, 
-                pn.Spacer(width=20), 
-                self.filename_label,
-                self.filename_input,
-                align='start'
-            ),
-            pn.Spacer(height=8),
-            self.output_path_display,
             pn.Spacer(height=20),
             pn.Row(
                 self.start_button,
@@ -320,9 +316,16 @@ class CameraTab:
             ),
             pn.Spacer(height=15),
             self.frame_pane,
+            pn.Spacer(height=10),
+            pn.Row(
+                self.download_widget,
+                align='center'
+            ),
+            pn.Spacer(height=10),
             self.status_text,
             self.camera_info_text,
             self.recording_text,
+            self.recording_info,
             self.debug_text,
             margin=(10, 0)
         )
