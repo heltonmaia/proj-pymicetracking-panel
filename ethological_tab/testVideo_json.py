@@ -45,10 +45,11 @@ THICKNESS = 2
 
 
 class TrackingVisualizer:
-    def __init__(self, video_path: str, json_path: str, output_path: Optional[str] = None, show_info: bool = False):
+    def __init__(self, video_path: str, json_path: str, output_path: Optional[str] = None, show_info: bool = False, show_heatmap: bool = True):
         self.video_path = Path(video_path)
         self.json_path = Path(json_path)
         self.show_info = show_info
+        self.show_heatmap = show_heatmap
         
         if output_path:
             self.output_path = Path(output_path)
@@ -183,14 +184,20 @@ class TrackingVisualizer:
         return frame
     
     def draw_info_panel(self, frame: np.ndarray, frame_data: Dict, frame_num: int) -> np.ndarray:
-        """Draw compact information panel on the frame (top-right corner)"""
+        """Draw compact information panel on the frame (top-left corner when heatmap is enabled)"""
         # Panel dimensions (smaller)
         panel_width = 200
         panel_height = 80
         
-        # Position in top-right corner
-        panel_x = self.frame_width - panel_width - 10
-        panel_y = 10
+        # Position based on whether heatmap is shown
+        if self.show_heatmap:
+            # Position in top-left corner to avoid heatmap
+            panel_x = 10
+            panel_y = 10
+        else:
+            # Position in top-right corner
+            panel_x = self.frame_width - panel_width - 10
+            panel_y = 10
         
         # Create semi-transparent background for info panel
         overlay = frame.copy()
@@ -386,8 +393,9 @@ class TrackingVisualizer:
                 # Add to accumulated trail (for mini-map - never removed)
                 self.accumulated_trail.append((int(centroid_x), int(centroid_y)))
                 
-                # Update heat map
-                self.update_heat_map(int(centroid_x), int(centroid_y))
+                # Update heat map (if enabled)
+                if self.show_heatmap:
+                    self.update_heat_map(int(centroid_x), int(centroid_y))
                 
                 # Draw centroid
                 frame_rgb = self.draw_centroid(frame_rgb, int(centroid_x), int(centroid_y), detection_method)
@@ -395,8 +403,9 @@ class TrackingVisualizer:
             # Draw trail
             frame_rgb = self.draw_trail(frame_rgb)
             
-            # Draw mini-map with accumulated trajectory
-            frame_rgb = self.draw_mini_map(frame_rgb)
+            # Draw mini-map with accumulated trajectory (if enabled)
+            if self.show_heatmap:
+                frame_rgb = self.draw_mini_map(frame_rgb)
             
             # Draw information panel (only if requested)
             if self.show_info:
@@ -437,6 +446,7 @@ def main():
     parser.add_argument("json_path", help="Path to tracking data JSON file")
     parser.add_argument("output_path", nargs="?", help="Path to output video file (optional)")
     parser.add_argument("--show-info", action="store_true", help="Show information panel on video")
+    parser.add_argument("--show-heatmap", action="store_true", default=True, help="Show heat map on video (default: True)")
     
     args = parser.parse_args()
     
@@ -451,7 +461,7 @@ def main():
     
     try:
         # Create visualizer and process video
-        visualizer = TrackingVisualizer(args.video_path, args.json_path, args.output_path, args.show_info)
+        visualizer = TrackingVisualizer(args.video_path, args.json_path, args.output_path, args.show_info, args.show_heatmap)
         visualizer.process_video()
         visualizer.cleanup()
         
