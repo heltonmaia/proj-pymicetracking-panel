@@ -34,7 +34,7 @@ COLORS = {
     "template_mask": (0, 255, 0),  # Green (Template detection)
     "template_centroid": (255, 0, 255),  # Purple (Template centroid)
     "text": (255, 255, 255),  # White
-    "roi_rectangle": (0, 0, 105), # Dark red
+    "roi_rectangle": (255, 0, 255), # Magenta - highly visible on both black and white
     "roi_circle": (0, 255, 0),
     "roi_polygon": (100,0,0),
 }
