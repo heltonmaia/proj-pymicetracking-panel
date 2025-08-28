@@ -106,6 +106,9 @@ dependencies = [
     
     # Geometric operations
     "shapely==2.0.6",
+    
+    # Video processing
+    "ffmpeg-python>=0.2.0",
 ]
 
 [project.optional-dependencies]

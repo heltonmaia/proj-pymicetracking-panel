@@ -69,11 +69,25 @@ class CameraTab:
             },
             value=(640, 480), width=150
         )
-        self.output_dir = pn.widgets.TextInput(
-            name='📁 Output folder:', 
-            value=EXPERIMENTS_DIR, 
-            width=350
+        # Output directory selection
+        self.selected_directory = EXPERIMENTS_DIR
+        self.browse_button = pn.widgets.Button(
+            name='📁 Browse Folder',
+            button_type='primary',
+            width=150,
+            height=35
         )
+        self.output_path_display = pn.pane.Markdown(
+            f"**Selected folder:** `{self.selected_directory}`",
+            width=400
+        )
+        self.filename_input = pn.widgets.TextInput(
+            name='',
+            value='recording',
+            placeholder='Enter filename (without extension)',
+            width=250
+        )
+        self.filename_label = pn.pane.Markdown("**📄 Filename:**", width=80, margin=(5, 5))
         self._connect_events()
 
     def _get_available_cameras(self):
@@ -92,6 +106,37 @@ class CameraTab:
         self.stop_button.on_click(self.stop_camera)
         self.record_button.on_click(self.start_recording)
         self.stop_record_button.on_click(self.stop_recording)
+        self.browse_button.on_click(self.browse_directory)
+
+    def browse_directory(self, event=None):
+        """Open directory browser using tkinter"""
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            
+            # Create a temporary root window (hidden)
+            root = tk.Tk()
+            root.withdraw()  # Hide the main window
+            root.attributes('-topmost', True)  # Bring to front
+            
+            # Open directory dialog
+            selected_dir = filedialog.askdirectory(
+                title='Select Output Directory',
+                initialdir=self.selected_directory
+            )
+            
+            # Clean up the temporary window
+            root.destroy()
+            
+            if selected_dir:  # User selected a directory
+                self.selected_directory = selected_dir
+                self.output_path_display.object = f"**Selected folder:** `{self.selected_directory}`"
+            
+        except ImportError:
+            # Fallback if tkinter is not available
+            self.output_path_display.object = "**Error:** tkinter not available. Please install tkinter for directory selection."
+        except Exception as e:
+            self.output_path_display.object = f"**Error:** {str(e)}"
 
     def start_camera(self, event=None):
         if self.streaming:
@@ -158,7 +203,7 @@ class CameraTab:
         self.recording = True
         
         # Ensure output folder exists
-        output_folder = self.output_dir.value
+        output_folder = self.selected_directory
         if not os.path.exists(output_folder):
             try:
                 os.makedirs(output_folder)
@@ -172,7 +217,9 @@ class CameraTab:
         # Scale video to current camera resolution
         width_cap = int(self.camera.get(cv2.CAP_PROP_FRAME_WIDTH))
         height_cap = int(self.camera.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        self.temp_video_file = os.path.join(output_folder, f"temp_video_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4")
+        # Use only custom filename
+        custom_name = self.filename_input.value.strip() or 'recording'
+        self.temp_video_file = os.path.join(output_folder, f"temp_{custom_name}.mp4")
         fps = self.camera.get(cv2.CAP_PROP_FPS)
         if fps <= 0:
             fps = 20.0
@@ -191,8 +238,10 @@ class CameraTab:
             self.video_writer.release()
             self.video_writer = None
         if self.temp_video_file and os.path.exists(self.temp_video_file):
-            final_filename = f"video_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
-            output_folder = self.output_dir.value
+            # Use only custom filename
+            custom_name = self.filename_input.value.strip() or 'recording'
+            final_filename = f"{custom_name}.mp4"
+            output_folder = self.selected_directory
             final_filepath = os.path.join(output_folder, final_filename)
             try:
                 os.rename(self.temp_video_file, final_filepath)
@@ -244,10 +293,23 @@ class CameraTab:
 
     def get_panel(self):
         return pn.Column(
-            pn.Row(self.camera_select, self.resolution_select),
-            pn.Spacer(height=10),
-            pn.Row(self.output_dir),
+            pn.Row(
+                self.camera_select, 
+                pn.Spacer(width=20), 
+                self.resolution_select,
+                align='start'
+            ),
             pn.Spacer(height=15),
+            pn.Row(
+                self.browse_button, 
+                pn.Spacer(width=20), 
+                self.filename_label,
+                self.filename_input,
+                align='start'
+            ),
+            pn.Spacer(height=8),
+            self.output_path_display,
+            pn.Spacer(height=20),
             pn.Row(
                 self.start_button,
                 self.stop_button,
@@ -256,7 +318,7 @@ class CameraTab:
                 self.stop_record_button,
                 align='center',
             ),
-            pn.Spacer(height=10),
+            pn.Spacer(height=15),
             self.frame_pane,
             self.status_text,
             self.camera_info_text,
