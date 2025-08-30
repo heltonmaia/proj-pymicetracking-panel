@@ -22,7 +22,6 @@ from tracking_tab.tracking_tab import get_tab as get_tracking_tab
 from ethological_tab.ethological_tab import get_tab as get_ethological_tab
 from irl_tab.irl_tab import get_tab as get_irl_tab
 from synthetic_tab.synthetic_tab import get_tab as get_synthetic_tab
-from documentation_tab.documentation_tab import get_tab as get_documentation_tab
 from extra_tools_tab.extra_tools_tab import get_tab as get_extra_tools_tab
 
 # Panel configuration
@@ -34,7 +33,6 @@ tracking_tab = get_tracking_tab()
 ethological_tab = get_ethological_tab()
 irl_tab = get_irl_tab()
 synthetic_tab = get_synthetic_tab()
-documentation_tab = get_documentation_tab()
 extra_tools_tab = get_extra_tools_tab()
 
 control_tabs = pn.Tabs(
@@ -44,7 +42,6 @@ control_tabs = pn.Tabs(
     ('🌐 IRL Analysis', irl_tab),
     ('🧪 Synthetic Data', synthetic_tab),
     ('🛠️ Extra Tools', extra_tools_tab),
-    ('📖 Documentation', documentation_tab),
     active=1  # Set Animal Tracking as default active tab
 )
 
