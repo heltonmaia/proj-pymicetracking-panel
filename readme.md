@@ -119,36 +119,23 @@ panel serve src/pymicetracking_panel/main.py --show
 
 ## Installation Extras
 
-The package includes optional dependency groups for modular installation:
+Optional dependency groups for modular installation:
 
-### GPU Support (CUDA acceleration)
 ```bash
+# GPU acceleration (CUDA support)
 uv pip install "pymicetracking-panel[gpu]"
-```
 
-### YOLO Only (minimal computer vision)
-```bash  
+# Computer vision only (minimal YOLO)
 uv pip install "pymicetracking-panel[yolo]"
-```
 
-### Visualization Only (analysis and plotting)
-```bash
+# Analysis and plotting tools
 uv pip install "pymicetracking-panel[viz]"
-```
 
-### Development Tools (testing, linting, formatting)
-```bash
+# Development tools (testing, linting, formatting)
 uv pip install "pymicetracking-panel[dev]"
 
-```
-
-### All Extras
-```bash
+# Install all extras
 uv sync --all-extras
-```
-
-See `pyproject.toml` for complete dependency specifications.
-
 ```
 
 
