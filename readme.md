@@ -1,127 +1,227 @@
-# pyMiceTracking Panel
+# 🐭 pyMiceTracking Panel
 
-A mouse tracking application with Panel interface and YOLO-based computer vision for behavioral analysis.
+A comprehensive mouse tracking application with Panel interface and YOLO-based computer vision for behavioral analysis.
 
-## Features
+## 🚀 Features
 
-- **Camera Tab**: Live camera feed integration
-- **Tracking Tab**: YOLO-based mouse detection and tracking
-- **Ethological Tab**: Behavioral analysis tools
-- **IRL Tab**: Real-world experiment integration
-- **Synthetic Tab**: Synthetic data generation
-- **Playback Tab**: Video playback and analysis
-- **Documentation Tab**: User guides and help
+- **📷 Camera & Recording**: Live camera feed integration and recording
+- **🔎 Animal Tracking**: YOLO-based mouse detection and tracking with GPU acceleration  
+- **🧬 Ethological Analysis**: 
+  - Video tracking analysis with heatmaps and info panels
+  - Movement heatmap analysis with center of mass calculations
+  - Individual plot generation and complete analysis panels
+  - High-quality PNG/EPS export capabilities
+- **🌐 IRL Analysis**: Real-world experiment integration
+- **🧪 Synthetic Data**: Synthetic data generation tools
+- **🛠️ Extra Tools**: Additional utilities and GPU testing
 
-## Prerequisites
+## 📋 Prerequisites
 
-- Python ≥3.11
-- [UV](https://docs.astral.sh/uv/) package manager
-- CUDA-compatible GPU (recommended for optimal performance)
+- **Python**: ≥3.11
+- **Package Manager**: [UV](https://docs.astral.sh/uv/) (recommended) or pip
+- **GPU**: CUDA-compatible GPU recommended for optimal performance
+- **System**: Linux/Windows/macOS
 
-## Quick Start
+## 🏗️ Project Structure
 
-1. **Clone the repository:**
+```
+proj-pymicetracking-panel/
+├── 📄 pyproject.toml           # Project configuration (optimized)
+├── 📄 readme.md               # This documentation
+├── 📄 .gitignore             # Git ignored files
+│
+├── 📁 src/                   # Source code (professional layout)
+│   └── 📁 pymicetracking_panel/
+│       ├── 📄 __init__.py        # Package initialization  
+│       ├── 📄 main.py           # Main application entry point
+│       │
+│       ├── 📁 camera_tab/       # Camera & Recording module
+│       ├── 📁 tracking_tab/     # Animal Tracking module
+│       │   ├── 📁 processing/   # Detection and tracking logic
+│       │   ├── 📁 models/       # YOLO model files
+│       │   └── 📁 temp/         # Temporary processing files
+│       │
+│       ├── 📁 ethological_tab/  # Ethological Analysis module  
+│       │   ├── 📄 ethological_tab.py   # Main analysis interface
+│       │   ├── 📄 testVideo_json.py    # Video processing utilities
+│       │   └── 📁 temp/                # Analysis output files
+│       │
+│       ├── 📁 irl_tab/          # IRL Analysis module
+│       ├── 📁 synthetic_tab/    # Synthetic Data module  
+│       └── 📁 extra_tools_tab/  # Extra Tools module
+│
+├── 📁 tests/                 # Unit tests
+├── 📁 experiments/          # Experiment data (gitignored)
+└── 📁 models/               # Additional models
+```
+
+## ⚡ Quick Start
+
+### Using UV (Recommended)
+
+1. **Install UV** (if not already installed):
    ```bash
-   git clone <repository-url>
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+2. **Clone and setup**:
+   ```bash
+   git clone https://github.com/heltonmaia/proj-pymicetracking-panel.git
    cd proj-pymicetracking-panel
    ```
 
-2. **Install dependencies:**
+3. **Install dependencies**:
    ```bash
    uv sync
    ```
 
-3. **Run the application:**
+4. **Run the application**:
    ```bash
-   uv run panel serve main.py --show
+   uv run panel serve src/pymicetracking_panel/main.py --show
    ```
 
-The application will open in your default browser at `http://localhost:5006/main`
+The application will open automatically in your browser at `http://localhost:5006/main`
 
-## Project Structure
+### Alternative Installation Methods
 
-```text
-proj-pymicetracking-panel/
-├── camera_tab/
-│   └── camera_tab.py
-├── tracking_tab/
-│   ├── tracking_tab.py
-│   ├── processing/
-│   │   ├── detection.py
-│   │   └── tracking.py
-│   ├── models/
-│   │   └── yolo_model.pt
-│   └── temp/
-├── ethological_tab/
-│   └── ethological_tab.py
-├── irl_tab/
-│   └── irl_tab.py
-├── synthetic_tab/
-│   └── synthetic_tab.py
-├── playback_tab/
-│   └── playback_tab.py
-├── documentation_tab/
-│   └── documentation_tab.py
-├── experiments/          # Shared data location (gitignored)
-├── main.py              # Main application entry point
-├── pyproject.toml       # Project dependencies and configuration
-└── readme.md
+#### Development Mode
+```bash
+# Install in editable mode
+uv pip install -e .
+
+# Or with extras
+uv pip install -e ".[dev,gpu,viz]"
+
+# Then run
+uv run pymicetracking
 ```
 
-## Development Setup
-
-### Using UV (Recommended)
-
+#### Build and Install
 ```bash
-# Install UV if not already installed
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Build the package
+uv build
 
-# Clone and setup the project
-git clone <repository-url>
-cd proj-pymicetracking-panel
+# Install the wheel
+uv pip install dist/pymicetracking_panel-0.1.0-py3-none-any.whl
 
-# Install all dependencies (including dev dependencies)
-uv sync --all-extras
+# Run via command
+pymicetracking
+```
 
-# Run the application
-uv run panel serve main.py --show
+#### Traditional pip
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# Run development tools
+pip install -e .
+panel serve src/pymicetracking_panel/main.py --show
+```
+
+## 📦 Installation Extras
+
+The package includes optional dependency groups for modular installation:
+
+### GPU Support (CUDA acceleration)
+```bash
+uv pip install "pymicetracking-panel[gpu]"
+```
+
+### YOLO Only (minimal computer vision)
+```bash  
+uv pip install "pymicetracking-panel[yolo]"
+```
+
+### Visualization Only (analysis and plotting)
+```bash
+uv pip install "pymicetracking-panel[viz]"
+```
+
+### Development Tools (testing, linting, formatting)
+```bash
+uv pip install "pymicetracking-panel[dev]"
+
+# Then use development commands
 uv run black .              # Format code
 uv run flake8 .             # Lint code  
 uv run mypy .               # Type checking
 uv run pytest              # Run tests
 ```
 
-### Alternative Setup (Traditional)
-
+### All Extras
 ```bash
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -e .
-
-# Run application
-panel serve main.py --show
+uv sync --all-extras
 ```
 
-## GPU Support
+## 🔧 Dependencies
 
-This project includes CUDA dependencies for GPU acceleration. If you don't have a CUDA-compatible GPU, the application will fall back to CPU processing (slower performance).
+### Fixed Versions (Critical)
+- **YOLO**: `ultralytics==8.3.102` (computer vision core)
+- **PyTorch**: `torch==2.6.0`, `torchvision==0.21.0` (deep learning)
+- **CUDA**: NVIDIA packages for GPU acceleration
+- **OpenCV**: `opencv-python==4.11.0.86` (image processing)
 
-## Dependencies
+### Flexible Versions (≥ minimum)
+- **Scientific**: numpy, scipy, pandas, matplotlib, seaborn
+- **Interface**: panel, bokeh and related packages  
+- **Utilities**: tqdm, pyyaml, requests, shapely
 
-Key dependencies include:
-- **Panel**: Web app framework
-- **OpenCV**: Computer vision
-- **Ultralytics YOLO**: Object detection
-- **PyTorch**: Deep learning framework
-- **NumPy/Pandas**: Data processing
+See `pyproject.toml` for complete dependency specifications.
 
-See `pyproject.toml` for complete dependency list.
+## 🧬 Ethological Analysis Features
 
-## License
+The ethological analysis module provides comprehensive behavioral analysis tools:
 
-MIT License
+### Video Tracking Analysis
+- **Video + JSON input**: Process recorded videos with tracking data
+- **Visualization options**: Info panels and movement heatmaps overlay
+- **Real-time processing**: Background analysis with progress tracking
+
+### Movement Heatmap Analysis  
+- **Heatmap generation**: High-resolution movement density visualization
+- **Center of mass analysis**: Distance calculations and movement patterns
+- **Multiple visualizations**:
+  - Distance from center over time
+  - Movement velocity analysis  
+  - Velocity distribution histograms
+  - Activity classification (moving vs stationary)
+  - Movement direction analysis (polar plots)
+  - Cumulative distance tracking
+
+### Configurable Parameters
+- **Heatmap settings**: Resolution (20-100 bins), colormap selection, transparency
+- **Movement analysis**: Threshold percentiles, histogram bins
+- **Export options**: PNG/EPS formats at 300 DPI
+
+### Analysis Modes
+- **Complete Panel**: Single comprehensive figure with all analyses
+- **Individual Plots**: Separate numbered figures for each analysis type
+
+## 🖥️ GPU Support
+
+This project includes CUDA dependencies for GPU acceleration:
+- **Automatic fallback**: CPU processing if no CUDA GPU detected
+- **Optimized performance**: Significant speedup with compatible hardware
+- **Memory management**: Efficient handling of large video files
+
+## 🧪 Development
+
+### Code Quality Tools
+```bash
+# Format code
+uv run black .
+
+# Lint code  
+uv run flake8 .
+
+# Type checking
+uv run mypy .
+
+# Run tests
+uv run pytest
+
+# All quality checks
+uv run black . && uv run flake8 . && uv run mypy . && uv run pytest
+```
+
+
+
