@@ -140,11 +140,6 @@ uv pip install "pymicetracking-panel[viz]"
 ```bash
 uv pip install "pymicetracking-panel[dev]"
 
-# Then use development commands
-uv run black .              # Format code
-uv run flake8 .             # Lint code  
-uv run mypy .               # Type checking
-uv run pytest              # Run tests
 ```
 
 ### All Extras
@@ -152,75 +147,8 @@ uv run pytest              # Run tests
 uv sync --all-extras
 ```
 
-## Dependencies
-
-### Fixed Versions (Critical)
-- **YOLO**: `ultralytics==8.3.102` (computer vision core)
-- **PyTorch**: `torch==2.6.0`, `torchvision==0.21.0` (deep learning)
-- **CUDA**: NVIDIA packages for GPU acceleration
-- **OpenCV**: `opencv-python==4.11.0.86` (image processing)
-
-### Flexible Versions (≥ minimum)
-- **Scientific**: numpy, scipy, pandas, matplotlib, seaborn
-- **Interface**: panel, bokeh and related packages  
-- **Utilities**: tqdm, pyyaml, requests, shapely
-
 See `pyproject.toml` for complete dependency specifications.
 
-## Ethological Analysis Features
-
-The ethological analysis module provides comprehensive behavioral analysis tools:
-
-### Video Tracking Analysis
-- **Video + JSON input**: Process recorded videos with tracking data
-- **Visualization options**: Info panels and movement heatmaps overlay
-- **Real-time processing**: Background analysis with progress tracking
-
-### Movement Heatmap Analysis  
-- **Heatmap generation**: High-resolution movement density visualization
-- **Center of mass analysis**: Distance calculations and movement patterns
-- **Multiple visualizations**:
-  - Distance from center over time
-  - Movement velocity analysis  
-  - Velocity distribution histograms
-  - Activity classification (moving vs stationary)
-  - Movement direction analysis (polar plots)
-  - Cumulative distance tracking
-
-### Configurable Parameters
-- **Heatmap settings**: Resolution (20-100 bins), colormap selection, transparency
-- **Movement analysis**: Threshold percentiles, histogram bins
-- **Export options**: PNG/EPS formats at 300 DPI
-
-### Analysis Modes
-- **Complete Panel**: Single comprehensive figure with all analyses
-- **Individual Plots**: Separate numbered figures for each analysis type
-
-## GPU Support
-
-This project includes CUDA dependencies for GPU acceleration:
-- **Automatic fallback**: CPU processing if no CUDA GPU detected
-- **Optimized performance**: Significant speedup with compatible hardware
-- **Memory management**: Efficient handling of large video files
-
-## Development
-
-### Code Quality Tools
-```bash
-# Format code
-uv run black .
-
-# Lint code  
-uv run flake8 .
-
-# Type checking
-uv run mypy .
-
-# Run tests
-uv run pytest
-
-# All quality checks
-uv run black . && uv run flake8 . && uv run mypy . && uv run pytest
 ```
 
 
