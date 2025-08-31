@@ -4,16 +4,16 @@ A comprehensive mouse tracking application with Panel interface and YOLO-based c
 
 ## 🚀 Features
 
-- **📷 Camera & Recording**: Live camera feed integration and recording
-- **🔎 Animal Tracking**: YOLO-based mouse detection and tracking with GPU acceleration  
-- **🧬 Ethological Analysis**: 
+- **Camera & Recording**: Live camera feed integration and recording
+- **Animal Tracking**: YOLO-based mouse detection and tracking with GPU acceleration  
+- **Ethological Analysis**: 
   - Video tracking analysis with heatmaps and info panels
   - Movement heatmap analysis with center of mass calculations
   - Individual plot generation and complete analysis panels
   - High-quality PNG/EPS export capabilities
-- **🌐 IRL Analysis**: Real-world experiment integration
-- **🧪 Synthetic Data**: Synthetic data generation tools
-- **🛠️ Extra Tools**: Additional utilities and GPU testing
+- **IRL Analysis**: Real-world experiment integration
+- **Synthetic Data**: Synthetic data generation tools
+- **Extra Tools**: Additional utilities and GPU testing
 
 ## 📋 Prerequisites
 
@@ -117,7 +117,7 @@ pip install -e .
 panel serve src/pymicetracking_panel/main.py --show
 ```
 
-## 📦 Installation Extras
+## Installation Extras
 
 The package includes optional dependency groups for modular installation:
 
@@ -152,7 +152,7 @@ uv run pytest              # Run tests
 uv sync --all-extras
 ```
 
-## 🔧 Dependencies
+## Dependencies
 
 ### Fixed Versions (Critical)
 - **YOLO**: `ultralytics==8.3.102` (computer vision core)
@@ -167,7 +167,7 @@ uv sync --all-extras
 
 See `pyproject.toml` for complete dependency specifications.
 
-## 🧬 Ethological Analysis Features
+## Ethological Analysis Features
 
 The ethological analysis module provides comprehensive behavioral analysis tools:
 
@@ -196,14 +196,14 @@ The ethological analysis module provides comprehensive behavioral analysis tools
 - **Complete Panel**: Single comprehensive figure with all analyses
 - **Individual Plots**: Separate numbered figures for each analysis type
 
-## 🖥️ GPU Support
+## GPU Support
 
 This project includes CUDA dependencies for GPU acceleration:
 - **Automatic fallback**: CPU processing if no CUDA GPU detected
 - **Optimized performance**: Significant speedup with compatible hardware
 - **Memory management**: Efficient handling of large video files
 
-## 🧪 Development
+## Development
 
 ### Code Quality Tools
 ```bash
