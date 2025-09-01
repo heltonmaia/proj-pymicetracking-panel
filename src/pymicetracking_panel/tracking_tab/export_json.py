@@ -1,29 +1,26 @@
-"""
-Data export utilities
-"""
-
 import json
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any
 
 
-def _convert_rois_to_dict(rois: List) -> List[Dict]:
+def _convert_rois_to_dict(rois: list) -> list[dict]:
     """Convert ROI objects to dictionary format"""
     result = []
-    
+
     for roi in rois:
         try:
-            if hasattr(roi, 'to_dict'):
+            if hasattr(roi, "to_dict"):
                 result.append(roi.to_dict())
-            elif hasattr(roi, '__dict__'):
+            elif hasattr(roi, "__dict__"):
                 result.append(roi.__dict__)
             else:
                 result.append(str(roi))
         except Exception as e:
             print(f"Warning: Could not convert ROI to dict: {e}")
             result.append({"error": f"Could not convert ROI: {str(e)}"})
-    
+
     return result
+
 
 def export_tracking_data(
     video_name: str,
@@ -32,9 +29,9 @@ def export_tracking_data(
     frames_without_detection: int,
     yolo_detections: int,
     template_detections: int,
-    rois: List,
-    roi_counts: Dict[int, int],
-    tracking_data: List[Dict[str, Any]],
+    rois: list,
+    roi_counts: dict[int, int],
+    tracking_data: list[dict[str, Any]],
 ) -> bytes:
     """
     Export tracking data to JSON format.
