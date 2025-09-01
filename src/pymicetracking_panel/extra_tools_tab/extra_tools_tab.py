@@ -63,13 +63,13 @@ class ExtraToolsTab:
                     result = (
                         "**GPU Status:** ✅ **Available**"
                         "\n"
-                        "**Device Information:**"
-                        f"- **GPU:** {device_name}"
-                        f"- **CUDA Version:** {cuda_version}"
-                        f"- **Device Count:** {device_count}"
-                        f"- **Memory Test:** ✅ Passed ({memory_allocated:.1f} MB allocated)"
+                        "**Device Information:**\n"
+                        f"- **GPU:** {device_name}\n"
+                        f"- **CUDA Version:** {cuda_version}\n"
+                        f"- **Device Count:** {device_count}\n"
+                        f"- **Memory Test:** ✅ Passed ({memory_allocated:.1f} MB allocated)\n"
                         "\n"
-                        "**Verdict:** GPU is ready for PyTorch operations!"
+                        "**Verdict:** GPU is ready for PyTorch operations!\n"
                     )
 
                     color = "#d4edda"  # Light green
@@ -78,28 +78,28 @@ class ExtraToolsTab:
                     result = (
                         "**GPU Status:** ⚠️ **Detected but Memory Issues**"
                         "\n"
-                        "**Device Information:**"
-                        f"- **GPU:** {device_name}"
-                        f"- **CUDA Version:** {cuda_version}"
-                        f"- **Memory Error:** {str(mem_error)}"
+                        "**Device Information:**\n"
+                        f"- **GPU:** {device_name}\n"
+                        f"- **CUDA Version:** {cuda_version}\n"
+                        f"- **Memory Error:** {str(mem_error)}\n"
                         "\n"
-                        "**Verdict:** GPU detected but cannot allocate memory properly."
+                        "**Verdict:** GPU detected but cannot allocate memory properly.\n"
                     )
                     color = "#fff3cd"  # Light yellow
             else:
                 result = (
                     "**GPU Status:** ❌ **Not Available**"
                     "\n"
-                    "**Issues:**"
-                    f"- No CUDA-compatible GPU detected by PyTorch"
-                    f"- PyTorch may not have CUDA support installed"
+                    "**Issues:**\n"
+                    f"- No CUDA-compatible GPU detected by PyTorch\n"
+                    f"- PyTorch may not have CUDA support installed\n"
                     "\n"
-                    "**Recommendations:**"
-                    "1. Check if NVIDIA GPU drivers are installed"
-                    "2. Install PyTorch with CUDA support"
-                    "3. Verify GPU is not being used by other processes"
+                    "**Recommendations:**\n"
+                    "1. Check if NVIDIA GPU drivers are installed\n"
+                    "2. Install PyTorch with CUDA support\n"
+                    "3. Verify GPU is not being used by other processes\n"
                     "\n"
-                    "**Verdict:** Will use CPU for computations."
+                    "**Verdict:** Will use CPU for computations.\n"
                 )
                 color = "#f8d7da"  # Light red
 
@@ -110,7 +110,7 @@ class ExtraToolsTab:
             error_result = (
                 "**GPU Status:** ❌ **Error During Test**"
                 "\n"
-                f"**Error:** {str(e)}"
+                f"**Error:** {str(e)}\n"
                 "\n"
                 "**Verdict:** Cannot determine GPU status."
             )
