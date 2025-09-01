@@ -1,3 +1,5 @@
+from io import BytesIO
+
 import cv2 as cv
 import numpy as np
 import panel as pn
@@ -293,6 +295,7 @@ class TrackingTab:
             width=100,
             height=35,
             disabled=True,
+            auto=False,  # Don't auto-download, wait for user click
         )
 
     def _cleanup_temp_files(self) -> None:
@@ -1296,7 +1299,16 @@ class TrackingTab:
     def _configure_download(self) -> None:
         """Configure the download button with tracking data"""
         try:
-            from io import BytesIO
+            # Validate required data
+            if not hasattr(self.file_input, "filename") or not self.file_input.filename:
+                self._add_log_message("❌ No video file loaded for download", "error")
+                return
+
+            if not self.tracking_data:
+                self._add_log_message(
+                    "❌ No tracking data available for download", "error"
+                )
+                return
 
             filename = create_download_filename(self.file_input.filename)
             data_bytes = export_tracking_data(
@@ -1313,14 +1325,22 @@ class TrackingTab:
 
             # Create BytesIO object from the data
             file_obj = BytesIO(data_bytes)
+            file_obj.seek(0)  # Ensure we're at the start of the data
 
             # Configure FileDownload widget
             self.button_download_json.file = file_obj
             self.button_download_json.filename = filename
+            self.button_download_json.mime_type = "application/json"
+
+            self._add_log_message(f"✅ Download ready: {filename}", "success")
+            print(f"Download configured successfully: {filename}")
 
         except Exception as e:
             self._add_log_message(f"❌ Error preparing download: {str(e)}", "error")
             print(f"Error configuring download: {e}")
+            import traceback
+
+            traceback.print_exc()
 
     def get_panel(self) -> pn.Column:
         return pn.Column(
