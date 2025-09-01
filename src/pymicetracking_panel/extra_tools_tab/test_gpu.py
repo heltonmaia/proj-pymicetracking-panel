@@ -1,7 +1,7 @@
 import torch
 from ultralytics import YOLO
 
-def check_gpu_support():
+def check_gpu_support() -> bool:
     print("="*50)
     print("Verificando suporte a GPU para YOLO")
     print("="*50)

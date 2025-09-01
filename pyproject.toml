@@ -28,12 +28,10 @@ dependencies = [
     # Core YOLO packages (fixos)
     "ultralytics==8.3.102",
     "ultralytics-thop==2.0.14",
-
     # PyTorch ecosystem (fixos)
     "torch==2.6.0",
     "torchvision==0.21.0",
     "triton==3.2.0",
-
     # NVIDIA CUDA packages (fixos)
     "nvidia-cublas-cu12==12.4.5.8",
     "nvidia-cuda-cupti-cu12==12.4.127",
@@ -48,34 +46,28 @@ dependencies = [
     "nvidia-nccl-cu12==2.21.5",
     "nvidia-nvjitlink-cu12==12.4.127",
     "nvidia-nvtx-cu12==12.4.127",
-
     # Computer vision essentials
     "opencv-python==4.11.0.86",
     "pillow>=10.4",
     "imageio>=2.37",
     "imageio-ffmpeg>=0.6",
-
     # Machine learning core
     "numpy>=1.26",
     "scipy>=1.15",
     "scikit-learn>=1.6",
     "pandas>=2.2",
-
     # Visualization
     "matplotlib>=3.10",
     "seaborn>=0.13",
-
     # Deep learning utilities
     "timm>=1.0.15",
     "safetensors>=0.5.3",
     "huggingface-hub>=0.31",
-
     # Utilities
     "tqdm>=4.67",
     "pyyaml>=6.0",
     "requests>=2.32",
     "urllib3>=1.26",
-
     # Panel/Bokeh specific packages
     "panel>=1.0.0",
     "bleach>=6.2",
@@ -103,12 +95,12 @@ dependencies = [
     "uc-micro-py>=1.0",
     "webencodings>=0.5",
     "xyzservices>=2025.4",
-
     # Geometric operations
     "shapely>=2.0",
-
     # Video processing
     "ffmpeg-python>=0.2.0",
+    "black>=25.1.0",
+    "isort>=6.0.1",
 ]
 
 [project.optional-dependencies]
@@ -130,15 +122,19 @@ viz = [
     "panel>=1.0.0",
 ]
 dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "black>=23.0.0",
-    "flake8>=6.0.0",
-    "mypy>=1.0.0",
+    "pre-commit>=3.7.0",
+    "black>=24.8.0",
+    "isort>=5.13.2",
+    "flake8>=7.1.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
 ]
 
+[[tool.uv.index]]
+url = "https://tractian-454752402615.d.codeartifact.us-east-1.amazonaws.com/pypi/data-repo/simple/"
+
 [project.scripts]
-pymicetracking = "pymicetracking_panel.main:main"
+pymicetracking = "pymicetracking_panel.app:main"
 
 [project.urls]
 Homepage = "https://github.com/heltonmaia/proj-pymicetracking-panel"
@@ -148,19 +144,40 @@ Issues = "https://github.com/heltonmaia/proj-pymicetracking-panel/issues"
 [tool.hatch.build.targets.wheel]
 packages = ["src/pymicetracking_panel"]
 
-[tool.black]
-line-length = 88
-target-version = ['py311']
-
-[tool.mypy]
-python_version = "3.11"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --cov=. --cov-report=term-missing"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["pymicetracking_panel"]
+known_third_party = ["panel", "numpy", "opencv-python", "ultralytics", "torch", "matplotlib", "scipy", "bokeh", "PIL"]
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503"]
+exclude = [".git", "__pycache__", "dist", "build", ".venv"]

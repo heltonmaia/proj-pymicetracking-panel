@@ -138,5 +138,58 @@ uv pip install "pymicetracking-panel[dev]"
 uv sync --all-extras
 ```
 
+## 🛠️ Development Setup
+
+For contributing to the project, you'll want to set up the development environment with code formatting and linting tools:
+
+### Quick Setup
+```bash
+# Clone the repository
+git clone <repo-url>
+cd proj-pymicetracking-panel
+
+# Run the setup script (installs dev dependencies and pre-commit hooks)
+./setup-dev.sh
+```
+
+### Manual Setup
+```bash
+# Install pre-commit hooks (runs black, isort, flake8 on each commit)
+pre-commit install
+```
+
+### Code Quality Tools
+
+The project uses the following tools to maintain code quality:
+
+- **Black**: Code formatter (88 character line length)
+- **isort**: Import sorter (compatible with Black)
+- **flake8**: Linter for style and error checking
+- **pre-commit**: Runs all tools automatically on commit
+
+### Running Tools Manually
+
+```bash
+# Format code
+black .
+
+# Sort imports
+isort .
+
+# Lint code
+flake8 src/ tests/
+
+# Run all pre-commit hooks
+pre-commit run --all-files
+```
+
+### GitHub Actions
+
+The project includes GitHub Actions workflows that:
+- ✅ Check code formatting and style on PRs
+- 🤖 Automatically format code in pull requests
+- 🧪 Run tests across Python 3.11 and 3.12
+- 📊 Generate coverage reports
+
 
 
