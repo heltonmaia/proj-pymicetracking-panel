@@ -1311,6 +1311,14 @@ class TrackingTab:
                 return
 
             filename = create_download_filename(self.file_input.filename)
+            
+            # Create roi_counts dictionary from frame_per_roi data
+            roi_counts_dict = {}
+            if self.roi_in_track and self.frame_per_roi:
+                for i, count in enumerate(self.frame_per_roi):
+                    if i < len(self.roi_in_track):
+                        roi_counts_dict[i + 1] = count  # Use 1-based indexing like the example
+                        
             data_bytes = export_tracking_data(
                 filename,
                 self.select_experiment_type.value,
@@ -1318,9 +1326,11 @@ class TrackingTab:
                 self.no_detection_count,
                 self.yolo_detections,
                 self.template_detections,
-                self.rois,
-                self.roi_count,
+                self.roi_in_track if self.roi_in_track else [],  # Use roi_in_track instead of self.rois
+                roi_counts_dict,
                 self.tracking_data,
+                self.circle_roi_data,  # Pass circle ROI data
+                self.frame_pane.height,  # Pass frame height for coordinate conversion
             )
 
             # Create BytesIO object from the data

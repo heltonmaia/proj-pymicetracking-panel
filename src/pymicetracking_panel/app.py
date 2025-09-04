@@ -47,7 +47,8 @@ layout.servable(title="pyMiceTracking")
 
 def main() -> None:
     """Entrypoint function for the pymicetracking command."""
-    layout.show(port=5007)
+    # layout.show(port=5007)  # Commented out to allow panel serve to handle multiple sessions
+    pass
 
 
 if __name__ == "__main__":

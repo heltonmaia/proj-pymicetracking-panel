@@ -1,6 +1,6 @@
-import base64
 import threading
 import time
+from io import BytesIO
 from pathlib import Path
 from typing import Callable
 
@@ -30,6 +30,7 @@ class VideoAnalysis:
         show_heatmap: bool,
         progress_callback: Callable[[int], None],
         status_callback: Callable[[str, str], None],
+        download_widget,
     ) -> None:
         """Start video analysis in background thread"""
         if not video_value or not json_value:
@@ -55,6 +56,7 @@ class VideoAnalysis:
                 show_heatmap,
                 progress_callback,
                 status_callback,
+                download_widget,
             ),
             daemon=True,
         )
@@ -74,6 +76,7 @@ class VideoAnalysis:
         show_heatmap: bool,
         progress_callback: Callable[[int], None],
         status_callback: Callable[[str, str], None],
+        download_widget,
     ) -> None:
         """Run the analysis in background thread"""
         try:
@@ -154,6 +157,9 @@ class VideoAnalysis:
 
             # Store output path for download
             self.current_output_path = output_path
+            
+            # Configure FileDownload widget with the video file
+            self._configure_download(output_path, download_widget)
 
         except ImportError as e:
             error_msg = (
@@ -225,34 +231,27 @@ class VideoAnalysis:
         except Exception as e:
             raise e
 
-    def download_file(self, status_callback: Callable[[str, str], None]) -> None:
-        """Handle video file download"""
-        if not self.current_output_path or not self.current_output_path.exists():
-            return
-
+    def _configure_download(self, output_path: Path, download_widget) -> None:
+        """Configure FileDownload widget with the generated video file"""
         try:
-            with open(self.current_output_path, "rb") as f:
+            if not output_path.exists():
+                return
+                
+            
+            # Read the video file
+            with open(output_path, "rb") as f:
                 video_data = f.read()
-
-            # Create a data URL for download
-            b64_data = base64.b64encode(video_data).decode()
-
-            # Create temporary download link and trigger it
-            js_code = (
-                "const link = document.createElement('a');"
-                f"link.href = 'data:video/mp4;base64,{b64_data}';"
-                f"link.download = '{self.current_output_path.name}';"
-                "document.body.appendChild(link);"
-                "link.click();"
-                "document.body.removeChild(link);"
-            )
-
-            # Execute JavaScript to trigger download
-            pn.io.push_notebook()
-            pn.pane.HTML(f"<script>{js_code}</script>").servable()
-
+            
+            # Create BytesIO object
+            file_obj = BytesIO(video_data)
+            file_obj.seek(0)
+            
+            # Configure FileDownload widget
+            download_widget.file = file_obj
+            download_widget.filename = output_path.name
+            download_widget.mime_type = "video/mp4"
+            download_widget.disabled = False
+            download_widget.visible = True
+            
         except Exception as e:
-            status_callback(
-                f"**Status:** ❌ Download Error\n\nCould not download file: {str(e)}",
-                "#f8d7da",
-            )
+            print(f"Error configuring download: {e}")

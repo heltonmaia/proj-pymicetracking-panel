@@ -74,13 +74,14 @@ class EthologicalTab:
         )
 
         # Download button component
-        self.download_button = pn.widgets.Button(
-            name="📥 Download Result",
+        self.download_button = pn.widgets.FileDownload(
+            label="📥 Download Result",
             button_type="success",
             width=150,
             height=40,
             disabled=True,
             visible=False,
+            auto=False,
         )
 
         # Movement Heatmap Analysis components
@@ -187,7 +188,7 @@ class EthologicalTab:
         self.heatmap_json_input.param.watch(self._on_heatmap_json_selected, "filename")
         self.start_analysis_button.on_click(self._start_analysis)
         self.abort_button.on_click(self._abort_analysis)
-        self.download_button.on_click(self._download_file)
+        # FileDownload widget doesn't need on_click - it handles download automatically
         self.generate_analysis_button.on_click(self._generate_complete_analysis)
         self.download_heatmap_button.on_click(self._download_analysis_image)
 
@@ -373,6 +374,7 @@ class EthologicalTab:
             self.show_heatmap.value,
             self._update_progress,
             self._update_unified_status,
+            self.download_button,  # Pass download button to configure it
         )
 
     def _update_progress(self, value: int) -> None:
@@ -392,9 +394,7 @@ class EthologicalTab:
         )
         self._reset_analysis_ui()
 
-    def _download_file(self, event) -> None:
-        """Handle download button click"""
-        self.video_analysis.download_file(self._update_unified_status)
+    # _download_file method removed - FileDownload widget handles this automatically
 
     def _generate_complete_analysis(self, event) -> None:
         """Generate complete movement analysis with heatmap and statistics"""

@@ -126,6 +126,62 @@ class TrackingVisualizer:
             (self.mini_map_height, self.mini_map_width), dtype=np.float32
         )
 
+    def convert_roi_format(self, rois: list[dict]) -> list[dict]:
+        """Convert ROI format from JSON tracking data to draw_rois format"""
+        converted_rois = []
+        
+        for roi in rois:
+            roi_type = roi.get("roi_type", "").lower()
+            
+            if roi_type == "rectangle":
+                # Convert from center/width/height to x0,y0,x1,y1
+                center_x = roi.get("center_x", 0)
+                center_y = roi.get("center_y", 0)
+                width = roi.get("width", 0)
+                height = roi.get("height", 0)
+                
+                # Handle negative width/height by calculating correct corners
+                if width < 0:
+                    x0 = center_x + width // 2  # width is negative, so this subtracts
+                    x1 = center_x - width // 2  # width is negative, so this adds
+                else:
+                    x0 = center_x - width // 2
+                    x1 = center_x + width // 2
+                    
+                if height < 0:
+                    y0 = center_y + height // 2  # height is negative, so this subtracts  
+                    y1 = center_y - height // 2  # height is negative, so this adds
+                else:
+                    y0 = center_y - height // 2
+                    y1 = center_y + height // 2
+                
+                converted_rois.append({
+                    "type": "rectangle",
+                    "coordinates": [x0, y0, x1, y1]
+                })
+                
+            elif roi_type == "circle":
+                # Convert from center/radius format
+                center_x = roi.get("center_x", 0)
+                center_y = roi.get("center_y", 0)
+                radius = roi.get("radius", 0)
+                
+                converted_rois.append({
+                    "type": "circle",
+                    "coordinates": [center_x, center_y, radius]
+                })
+                
+            elif roi_type == "polygon":
+                # Convert vertices format
+                vertices = roi.get("vertices", [])
+                if vertices:
+                    converted_rois.append({
+                        "type": "polygon",
+                        "coordinates": vertices
+                    })
+        
+        return converted_rois
+
     def draw_rois(self, frame: np.ndarray, rois: list[dict]) -> np.ndarray:
         """Draw ROIs on the frame"""
         for roi in rois:
@@ -139,15 +195,6 @@ class TrackingVisualizer:
                     (int(x1), int(y1)),
                     COLORS["roi_rectangle"],
                     2,
-                )
-                cv.putText(
-                    frame,
-                    "ROI",
-                    (int(x0), int(y0) - 5),
-                    FONT,
-                    FONT_SCALE,
-                    COLORS["roi_rectangle"],
-                    THICKNESS,
                 )
 
             elif roi_type == "circle":
@@ -168,31 +215,11 @@ class TrackingVisualizer:
                     -1,
                 )
                 cv.addWeighted(overlay, 0.1, frame, 0.9, 0, frame)
-                cv.putText(
-                    frame,
-                    "ROI",
-                    (int(center_x - radius), int(center_y - radius - 5)),
-                    FONT,
-                    FONT_SCALE,
-                    COLORS["roi_circle"],
-                    THICKNESS,
-                )
 
             elif roi_type == "polygon":
                 points = np.array(roi["coordinates"], np.int32)
                 points = points.reshape((-1, 1, 2))
                 cv.polylines(frame, [points], True, COLORS["roi_polygon"], 2)
-                if len(roi["coordinates"]) > 0:
-                    x, y = roi["coordinates"][0]
-                    cv.putText(
-                        frame,
-                        "ROI",
-                        (int(x), int(y) - 5),
-                        FONT,
-                        FONT_SCALE,
-                        COLORS["roi_polygon"],
-                        THICKNESS,
-                    )
 
         return frame
 
@@ -470,6 +497,9 @@ class TrackingVisualizer:
         frame_num = 0
         tracking_frames = self.tracking_data.get("tracking_data", [])
         rois = self.tracking_data.get("rois", [])
+        
+        # Convert ROIs to proper format for drawing
+        converted_rois = self.convert_roi_format(rois) if rois else []
 
         while True:
             ret, frame = self.cap.read()
@@ -490,8 +520,8 @@ class TrackingVisualizer:
                 frame_data = {"detection_method": "No data"}
 
             # Draw ROIs
-            if rois:
-                frame_rgb = self.draw_rois(frame_rgb, rois)
+            if converted_rois:
+                frame_rgb = self.draw_rois(frame_rgb, converted_rois)
 
             # Draw centroid and update trail
             centroid_x = frame_data.get("centroid_x")
