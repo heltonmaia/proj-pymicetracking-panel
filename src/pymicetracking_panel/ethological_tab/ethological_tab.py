@@ -155,9 +155,9 @@ class EthologicalTab:
         )
 
         self.generate_analysis_button = pn.widgets.Button(
-            name="📊 Generate Analysis",
+            name="📊 Generate Analysis (JSON required)",
             button_type="primary",
-            width=200,
+            width=250,
             height=40,
             disabled=True,
         )
@@ -458,47 +458,26 @@ class EthologicalTab:
             pn.Row(
                 # Left side - File inputs and options
                 pn.Column(
-                    # File Selection with background
-                    pn.Column(
-                        pn.pane.Markdown("**File Selection:**", margin=(5, 5, 5, 5)),
-                        self.video_input,
-                        self.json_input,
-                        styles={
-                            "background": "#fff3e0",
-                            "padding": "10px",
-                            "border-radius": "8px",
-                            "margin": "5px",
-                        },
-                    ),
+                    pn.pane.Markdown("**File Selection:**", margin=(0, 0, 10, 0)),
+                    self.video_input,
+                    self.json_input,
                     pn.Spacer(height=15),
-                    # Analysis Options with background
-                    pn.Column(
-                        pn.pane.Markdown("**Analysis Options:**", margin=(5, 5, 5, 5)),
-                        self.show_info_panel,
-                        self.show_heatmap,
-                        styles={
-                            "background": "#fce4ec",
-                            "padding": "10px",
-                            "border-radius": "8px",
-                            "margin": "5px",
-                        },
-                    ),
+                    pn.pane.Markdown("**Analysis Options:**", margin=(0, 0, 10, 0)),
+                    self.show_info_panel,
+                    self.show_heatmap,
                     pn.Spacer(height=15),
-                    # Analysis Controls with background
-                    pn.Column(
-                        pn.pane.Markdown("**Analysis Controls:**", margin=(5, 5, 5, 5)),
-                        pn.Row(
-                            self.start_analysis_button,
-                            self.abort_button,
-                            self.download_button,
-                        ),
-                        styles={
-                            "background": "#e0f2f1",
-                            "padding": "10px",
-                            "border-radius": "8px",
-                            "margin": "5px",
-                        },
+                    pn.pane.Markdown("**Analysis Controls:**", margin=(0, 0, 10, 0)),
+                    pn.Row(
+                        self.start_analysis_button,
+                        self.abort_button,
+                        self.download_button,
                     ),
+                    styles={
+                        "background": "#f8f4e6",
+                        "padding": "20px",
+                        "border-radius": "8px",
+                        "margin": "10px"
+                    },
                     width=480,
                 ),
                 pn.Spacer(width=20),
@@ -517,66 +496,38 @@ class EthologicalTab:
                 # Left side - File inputs and configuration
                 pn.Column(
                     self.heatmap_json_input,
-                    pn.Spacer(height=15),
-                    # Heatmap Configuration with background
-                    pn.Column(
-                        pn.pane.Markdown(
-                            "**Heatmap Configuration:**", margin=(5, 5, 5, 5)
-                        ),
-                        self.heatmap_bins,
-                        pn.Row(
-                            self.heatmap_colormap,
-                            pn.Spacer(width=10),
-                            self.heatmap_alpha,
-                        ),
-                        styles={
-                            "background": "#e3f2fd",
-                            "padding": "10px",
-                            "border-radius": "8px",
-                            "margin": "5px",
-                        },
+                    pn.Spacer(height=20),
+                    pn.pane.Markdown("**Heatmap Configuration:**", margin=(0, 0, 10, 0)),
+                    self.heatmap_bins,
+                    pn.Row(
+                        self.heatmap_colormap,
+                        pn.Spacer(width=10),
+                        self.heatmap_alpha,
                     ),
                     pn.Spacer(height=15),
-                    # Movement Analysis Configuration with background
-                    pn.Column(
-                        pn.pane.Markdown(
-                            "**Movement Analysis Configuration:**", margin=(5, 5, 5, 5)
-                        ),
-                        self.movement_threshold_percentile,
-                        self.velocity_bins,
-                        styles={
-                            "background": "#f3e5f5",
-                            "padding": "10px",
-                            "border-radius": "8px",
-                            "margin": "5px",
-                        },
-                    ),
+                    pn.pane.Markdown("**Movement Analysis Configuration:**", margin=(0, 0, 10, 0)),
+                    self.movement_threshold_percentile,
+                    self.velocity_bins,
                     pn.Spacer(height=15),
-                    # Export and Analysis Options with background
-                    pn.Column(
-                        pn.pane.Markdown(
-                            "**Export & Analysis Options:**", margin=(5, 5, 10, 5)
-                        ),
-                        pn.pane.Markdown("**Export Format:**", margin=(0, 0, 5, 0)),
-                        self.export_format,
-                        pn.Spacer(height=15),
-                        pn.pane.Markdown("**Analysis Mode:**", margin=(0, 0, 5, 0)),
-                        self.analysis_type,
-                        pn.Spacer(height=20),
-                        pn.pane.Markdown("**Actions:**", margin=(0, 0, 10, 0)),
-                        pn.Row(
-                            self.generate_analysis_button,
-                            pn.Spacer(width=10),
-                            self.download_heatmap_button,
-                        ),
-                        styles={
-                            "background": "#e8f5e8",
-                            "padding": "15px",
-                            "border-radius": "8px",
-                            "margin": "5px",
-                        },
-                        width=460,
+                    pn.pane.Markdown("**Export & Analysis Options:**", margin=(0, 0, 10, 0)),
+                    pn.pane.Markdown("**Export Format:**", margin=(0, 0, 5, 0)),
+                    self.export_format,
+                    pn.Spacer(height=15),
+                    pn.pane.Markdown("**Analysis Mode:**", margin=(0, 0, 5, 0)),
+                    self.analysis_type,
+                    pn.Spacer(height=20),
+                    pn.pane.Markdown("**Actions:**", margin=(0, 0, 10, 0)),
+                    pn.Row(
+                        self.generate_analysis_button,
+                        pn.Spacer(width=10),
+                        self.download_heatmap_button,
                     ),
+                    styles={
+                        "background": "#e8f5f0",
+                        "padding": "20px",
+                        "border-radius": "8px",
+                        "margin": "10px"
+                    },
                     width=500,
                 ),
                 pn.Spacer(width=20),

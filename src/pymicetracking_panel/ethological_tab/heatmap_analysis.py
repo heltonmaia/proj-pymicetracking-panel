@@ -179,8 +179,9 @@ class HeatmapAnalysis:
     ) -> None:
         """Generate complete analysis panel with all plots"""
         # Create comprehensive analysis figure
-        fig = plt.figure(figsize=(20, 16))
-        gs = fig.add_gridspec(3, 3, height_ratios=[2, 1.5, 1.5], width_ratios=[2, 1, 1])
+        fig = plt.figure(figsize=(24, 18))
+        gs = fig.add_gridspec(3, 3, height_ratios=[2.5, 1.2, 1.2], width_ratios=[2.2, 1, 1], 
+                             hspace=0.3, wspace=0.25)
 
         # Calculate additional statistics
         total_distance = np.sum(velocities) if velocities else 0
@@ -244,39 +245,41 @@ class HeatmapAnalysis:
         ax2.axis("off")
 
         stats_text = (
-            "Movement Analysis Summary"
-            f"Total Frames: {len(frames)}"
-            f"Analysis Duration: {len(frames)} frames"
+            "Movement Analysis Summary\n"
+            f"Total Frames: {len(frames)}\n"
+            f"Duration: {len(frames)} frames\n"
             "\n"
-            f"Spatial Statistics:"
-            f"• Center of Mass: ({center_x:.1f}, {center_y:.1f})"
-            f"• Mean distance from center: {np.mean(distances_from_center):.1f}px"
-            f"• Max distance from center: {max_distance_from_center:.1f}px"
+            f"Spatial Statistics:\n"
+            f"• Center: ({center_x:.0f}, {center_y:.0f})\n"
+            f"• Mean dist: {np.mean(distances_from_center):.1f}px\n"
+            f"• Max dist: {max_distance_from_center:.1f}px\n"
             "\n"
-            f"Movement Statistics:"
-            f"• Total distance traveled: {total_distance:.1f}px"
-            f"• Mean velocity: {np.mean(velocities) if velocities else 0:.1f}px/frame"
-            f"• Max velocity: {np.max(velocities) if velocities else 0:.1f}px/frame"
-            f"• Movement threshold: {movement_threshold:.1f}px/frame"
-            f"• Time stationary: {stationary_ratio*100:.1f}%"
-            f"• Time moving: {(1-stationary_ratio)*100:.1f}%"
+            f"Movement Statistics:\n"
+            f"• Total dist: {total_distance:.1f}px\n"
+            f"• Mean vel: {np.mean(velocities) if velocities else 0:.2f}px/f\n"
+            f"• Max vel: {np.max(velocities) if velocities else 0:.2f}px/f\n"
+            f"• Threshold: {movement_threshold:.2f}px/f\n"
+            f"• Stationary: {stationary_ratio*100:.1f}%\n"
+            f"• Moving: {(1-stationary_ratio)*100:.1f}%\n"
             "\n"
-            f"Configuration:"
-            f"• Heatmap bins: {heatmap_bins}"
-            f"• Colormap: {heatmap_colormap}"
-            f"• Transparency: {heatmap_alpha}"
-            f"• Movement threshold: {movement_threshold_percentile}th percentile"
+            f"Configuration:\n"
+            f"• Bins: {heatmap_bins}\n"
+            f"• Colormap: {heatmap_colormap}\n"
+            f"• Alpha: {heatmap_alpha}\n"
+            f"• Threshold: {movement_threshold_percentile}th perc"
         )
 
         ax2.text(
-            0.05,
-            0.95,
+            0.02,
+            0.98,
             stats_text,
             transform=ax2.transAxes,
-            fontsize=10,
+            fontsize=9,
             verticalalignment="top",
             fontfamily="monospace",
-            bbox=dict(boxstyle="round", facecolor="lightgray", alpha=0.8),
+            bbox=dict(boxstyle="round", facecolor="lightgray", alpha=0.9, pad=0.5),
+            linespacing=1.1,
+            wrap=True,
         )
 
         # Plot 3: Distance from center
@@ -288,7 +291,7 @@ class HeatmapAnalysis:
             linestyle="--",
             label=f"Mean: {np.mean(distances_from_center):.1f}px",
         )
-        ax3.set_title("Distance from Center of Mass", fontweight="bold")
+        ax3.set_title("Distance from Center of Mass", fontsize=13, fontweight="bold")
         ax3.set_xlabel("Frame Number")
         ax3.set_ylabel("Distance (pixels)")
         ax3.grid(True, alpha=0.3)
@@ -311,7 +314,7 @@ class HeatmapAnalysis:
                 linestyle=":",
                 label=f"Movement threshold",
             )
-            ax4.set_title("Movement Velocity", fontweight="bold")
+            ax4.set_title("Movement Velocity", fontsize=13, fontweight="bold")
             ax4.set_xlabel("Frame Number")
             ax4.set_ylabel("Velocity (pixels/frame)")
             ax4.grid(True, alpha=0.3)
@@ -339,7 +342,7 @@ class HeatmapAnalysis:
                 linestyle=":",
                 label=f"Movement threshold",
             )
-            ax5.set_title("Velocity Distribution", fontweight="bold")
+            ax5.set_title("Velocity Distribution", fontsize=13, fontweight="bold")
             ax5.set_xlabel("Velocity (pixels/frame)")
             ax5.set_ylabel("Frequency")
             ax5.legend()
@@ -353,7 +356,7 @@ class HeatmapAnalysis:
             ax6.pie(
                 sizes, labels=labels, autopct="%1.1f%%", colors=colors, startangle=90
             )
-            ax6.set_title("Activity Classification", fontweight="bold")
+            ax6.set_title("Activity Classification", fontsize=13, fontweight="bold")
 
         # Plot 7: Movement directions
         ax7 = fig.add_subplot(gs[2, 1], projection="polar")
@@ -367,7 +370,7 @@ class HeatmapAnalysis:
 
             theta = np.array(angles) * np.pi / 180
             ax7.hist(theta, bins=16, alpha=0.7, color="green")
-            ax7.set_title("Movement Directions", fontweight="bold", pad=20)
+            ax7.set_title("Movement Directions", fontsize=13, fontweight="bold", pad=20)
             ax7.set_theta_zero_location("E")
             ax7.set_theta_direction(1)
 
@@ -376,12 +379,12 @@ class HeatmapAnalysis:
         if velocities:
             cumulative_distance = np.cumsum(velocities)
             ax8.plot(frames[1:], cumulative_distance, "orange", linewidth=2)
-            ax8.set_title("Cumulative Distance", fontweight="bold")
+            ax8.set_title("Cumulative Distance", fontsize=13, fontweight="bold")
             ax8.set_xlabel("Frame Number")
             ax8.set_ylabel("Cumulative Distance (pixels)")
             ax8.grid(True, alpha=0.3)
 
-        plt.tight_layout()
+        plt.tight_layout(pad=2.0)
 
         # Save complete panel
         output_path = self.temp_dir / f"{base_name}_complete_analysis.{format_ext}"
