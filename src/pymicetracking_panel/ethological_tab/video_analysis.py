@@ -17,7 +17,6 @@ class VideoAnalysis:
         self.project_root = project_root
         self.analysis_process = None
         self.is_analyzing = False
-        self.progress_thread_running = False
         self.current_output_path = None
 
     def start_analysis(
@@ -118,6 +117,7 @@ class VideoAnalysis:
                 output_path=str(output_path),
                 show_info=show_info,
                 show_heatmap=show_heatmap,
+                progress_callback=progress_callback,
             )
 
             progress_callback(30)
@@ -129,8 +129,12 @@ class VideoAnalysis:
                 "#fff3cd",
             )
 
-            # Process video with progress updates
-            self._process_with_progress(visualizer, progress_callback, status_callback)
+            # Process video - now with real progress updates from visualizer
+            status_callback(
+                f"**Status:** 🔄 Processing {visualizer.total_frames} frames...\n\nReal-time progress will be shown below...",
+                "#fff3cd",
+            )
+            visualizer.process_video()
 
             if not self.is_analyzing:  # Check if aborted
                 return
@@ -186,50 +190,6 @@ class VideoAnalysis:
                     except:
                         pass
 
-    def _process_with_progress(
-        self,
-        visualizer: TrackingVisualizer,
-        progress_callback: Callable[[int], None],
-        status_callback: Callable[[str, str], None],
-    ) -> None:
-        """Process video with progress updates"""
-        try:
-            self.progress_thread_running = True
-
-            def update_progress() -> None:
-                # Simulate progress updates while processing
-                for i in range(30, 90, 10):
-                    if (
-                        not self.is_analyzing or not self.progress_thread_running
-                    ):  # Check if aborted or should stop
-                        return
-                    time.sleep(1)  # Update every second
-                    progress_callback(i)
-                    status_callback(
-                        (
-                            f"**Status:** 🔄 Processing frames... ({i}%)\n\n"
-                            f"Analyzing video with tracking data..."
-                        ),
-                        "#fff3cd",
-                    )
-
-            # Start progress update thread
-            progress_thread = threading.Thread(target=update_progress, daemon=True)
-            progress_thread.start()
-
-            # Process the video
-            visualizer.process_video()
-
-            # Stop progress thread and wait a moment for it to finish
-            self.progress_thread_running = False
-            time.sleep(0.5)
-
-            # Complete progress
-            if self.is_analyzing:  # Only if not aborted
-                progress_callback(95)
-
-        except Exception as e:
-            raise e
 
     def _configure_download(self, output_path: Path, download_widget) -> None:
         """Configure FileDownload widget with the generated video file"""

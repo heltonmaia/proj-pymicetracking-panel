@@ -37,7 +37,6 @@ from threading import Timer
 from ultralytics import YOLO
 
 from .export_json import create_download_filename, export_tracking_data
-from .export_roi import export_roi_data
 from .processing.tracking import create_roi_mask, draw_rois, process_frame
 
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
@@ -1269,9 +1268,8 @@ class TrackingTab:
         self.warning.visible = False
 
     def _rois_to_json(self, event) -> None:
-        export_roi_data(
-            self.rois, self.frame_pane.height, self.frame_pane.width
-        )
+        # ROI export functionality removed - ROIs are now included in the main tracking data export
+        pass
 
     def _configure_download(self) -> None:
         """Configure the download button with tracking data"""

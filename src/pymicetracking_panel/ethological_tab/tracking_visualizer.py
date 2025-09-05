@@ -51,11 +51,13 @@ class TrackingVisualizer:
         output_path: Optional[str] = None,
         show_info: bool = False,
         show_heatmap: bool = True,
+        progress_callback=None,
     ) -> None:
         self.video_path = Path(video_path)
         self.json_path = Path(json_path)
         self.show_info = show_info
         self.show_heatmap = show_heatmap
+        self.progress_callback = progress_callback
 
         if output_path:
             self.output_path = Path(output_path)
@@ -571,6 +573,10 @@ class TrackingVisualizer:
                 print(
                     f"Progress: {progress:.1f}% ({frame_num}/{self.total_frames} frames)"
                 )
+                # Update UI progress bar if callback is provided
+                if self.progress_callback:
+                    ui_progress = 30 + int(progress * 0.65)  # Map to 30-95% range
+                    self.progress_callback(ui_progress)
 
         print(
             f"Video processing completed!\n"
