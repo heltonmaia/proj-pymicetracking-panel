@@ -153,7 +153,6 @@ def export_tracking_data(
     yolo_detections: int,
     template_detections: int,
     rois: list,
-    roi_counts: dict[int, int],
     tracking_data: list[dict[str, Any]],
     circle_roi_data: dict = None,
     frame_height: int = None,
@@ -169,7 +168,6 @@ def export_tracking_data(
         - yolo_detections: Number of YOLO detections
         - template_detections: Number of template matching detections
         - rois: List of ROI objects
-        - roi_counts: Dictionary of ROI counts
         - tracking_data: List of frame tracking data
 
     Returns:
@@ -185,7 +183,6 @@ def export_tracking_data(
         "yolo_detections": yolo_detections,
         "template_detections": template_detections,
         "rois": _convert_rois_to_dict(rois, circle_roi_data, frame_height),
-        "roi_counts": roi_counts,
         "tracking_data": tracking_data,
     }
 

@@ -2,11 +2,11 @@ import json
 
 
 def export_roi_data(
-    rois: list, roi_count: int, image_height: int, image_width: int
+    rois: list, image_height: int, image_width: int
 ) -> None:
     json_list = []
 
-    json_dict = {"rois": [], "roi_counts": roi_count}
+    json_dict = {"rois": []}
 
     for roi in rois:
         # image_height - height_in frame happens bc of orientation in xy-axis

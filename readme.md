@@ -183,13 +183,6 @@ flake8 src/ tests/
 pre-commit run --all-files
 ```
 
-### GitHub Actions
-
-The project includes GitHub Actions workflows that:
-- ✅ Check code formatting and style on PRs
-- 🤖 Automatically format code in pull requests
-- 🧪 Run tests across Python 3.11 and 3.12
-- 📊 Generate coverage reports
 
 
 

@@ -84,10 +84,8 @@ class TrackingTab:
 
         # store rois
         self.rois = []
-        self.roi_count = 0
         self.select_roi = None
         self.roi_in_track = None
-        self.frame_per_roi = []
 
         # roi bounding box
         self.bounding_box = BoxAnnotation(fill_alpha=0.3, fill_color="red")
@@ -124,7 +122,6 @@ class TrackingTab:
         self.tracking_log = pn.pane.Markdown("", visible=False)
         self.log_messages = []  # Store all log messages
         self.tracking_data = []
-        self.frame_per_roi = []
         self.frame_count = 0
         self.total_frames = 0  # Total frames in the video
         self.no_detection_count = 0
@@ -346,7 +343,6 @@ class TrackingTab:
                 self._thread_hide_warning()
                 return
 
-            self.roi_count += 1
             self.start_bounding_box["x"], self.start_bounding_box["y"] = (
                 event.x,
                 event.y,
@@ -373,7 +369,6 @@ class TrackingTab:
                 self._thread_hide_warning()
                 return
 
-            self.roi_count += 1
             self.circle_start_point["x"], self.circle_start_point["y"] = (
                 event.x,
                 event.y,
@@ -446,7 +441,6 @@ class TrackingTab:
                 left=self.bounding_box.left,
             )
             self.rois.append(aux_box)
-            self.frame_per_roi.append(0)
 
             self.frame_pane.add_layout(aux_box)
 
@@ -486,10 +480,7 @@ class TrackingTab:
             }
 
             self.rois.append(final_circle)
-            self.frame_per_roi.append(0)
 
-            # Important: increment roi_count for circles too
-            # Note: roi_count was already incremented in _bb_pan_start, so we don't increment again here
 
             self.button_clear_roi.disabled = False
             self.button_start_tracking.disabled = False
@@ -531,7 +522,7 @@ class TrackingTab:
                 print(f"Manual button test failed: {e}")
 
             print(
-                f"Circle ROI created. Total ROIs: {len(self.rois)}, roi_count: {self.roi_count}"
+                f"Circle ROI created. Total ROIs: {len(self.rois)}"
             )
             print(
                 f"video_loaded: {self.video_loaded}, button disabled: {self.button_start_tracking.disabled}"
@@ -585,9 +576,7 @@ class TrackingTab:
 
                 # send the points and reset poly_annotations
                 self.rois.append(polygon)
-                self.frame_per_roi.append(0)
-                self.roi_count += 1
-
+        
                 self.poly_annotation_points_x, self.poly_annotation_points_y = [], []
 
             else:
@@ -653,9 +642,7 @@ class TrackingTab:
                         marker="circle",
                     )
                     self.rois.append(circle_draw)
-                    self.frame_per_roi.append(0)
-                    self.roi_count += 1
-
+                
                     # clear dots storage
                     self.circle_annotation_points = []
                     self.circle_x_y_points = []
@@ -721,9 +708,7 @@ class TrackingTab:
 
             # Reset all ROI-related data structures
             self.rois = []
-            self.roi_count = 0
-            self.frame_per_roi = []
-
+        
             # Clear polygon points and connecting lines
             self.poly_annotation_points_draw = []
             self.poly_annotation_points_x = []
@@ -1104,7 +1089,6 @@ class TrackingTab:
 
         # Clear tracking data but keep ROI reference for new experiment
         self.tracking_data = []
-        self.frame_per_roi = []
         self.frame_count = 0
         self.no_detection_count = 0
         self.yolo_detections = 0
@@ -1121,7 +1105,6 @@ class TrackingTab:
 
         # Clear all ROI data
         self.rois = []
-        self.roi_count = 0
         self.roi_dots = []
         self.roi_lines = []
         self.circle_roi_data = {}  # Clear circle data storage
@@ -1264,12 +1247,6 @@ class TrackingTab:
             f"**Template detections:** {self.template_detections}\n\n"
         )
 
-        if self.roi_in_track and len(self.frame_per_roi) > 0:
-            for index, roi in enumerate(self.roi_in_track):
-                if index < len(self.frame_per_roi):
-                    log_text += (
-                        f"**Roi {index}:** {self.frame_per_roi[index]} frames\n\n"
-                    )
 
         if self.tracking_data and len(self.tracking_data) > 0:
             last_frame = self.tracking_data[-1]
@@ -1293,7 +1270,7 @@ class TrackingTab:
 
     def _rois_to_json(self, event) -> None:
         export_roi_data(
-            self.rois, self.roi_count, self.frame_pane.height, self.frame_pane.width
+            self.rois, self.frame_pane.height, self.frame_pane.width
         )
 
     def _configure_download(self) -> None:
@@ -1312,13 +1289,6 @@ class TrackingTab:
 
             filename = create_download_filename(self.file_input.filename)
             
-            # Create roi_counts dictionary from frame_per_roi data
-            roi_counts_dict = {}
-            if self.roi_in_track and self.frame_per_roi:
-                for i, count in enumerate(self.frame_per_roi):
-                    if i < len(self.roi_in_track):
-                        roi_counts_dict[i + 1] = count  # Use 1-based indexing like the example
-                        
             data_bytes = export_tracking_data(
                 filename,
                 self.select_experiment_type.value,
@@ -1327,7 +1297,6 @@ class TrackingTab:
                 self.yolo_detections,
                 self.template_detections,
                 self.roi_in_track if self.roi_in_track else [],  # Use roi_in_track instead of self.rois
-                roi_counts_dict,
                 self.tracking_data,
                 self.circle_roi_data,  # Pass circle ROI data
                 self.frame_pane.height,  # Pass frame height for coordinate conversion

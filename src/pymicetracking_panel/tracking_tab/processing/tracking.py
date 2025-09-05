@@ -25,7 +25,6 @@ except ImportError:
 
 from ultralytics import YOLO
 
-from shapely.geometry import Point, Polygon
 from .detection import calculate_centroid, template_matching
 
 COLORS = {
@@ -39,65 +38,6 @@ COLORS = {
     "roi_polygon": (100,0,0),
 }
 
-def get_current_roi(params, rois: list, frame_height, centroid_x, centroid_y, circle_data: dict = None):
-    """
-    
-    """
-    centroid = Point(centroid_x, centroid_y)
-    
-    # Ensure frame_per_roi has enough elements
-    while len(params.frame_per_roi) <= len(rois):
-        params.frame_per_roi.append(0)
-    
-    for index, roi in enumerate(rois): 
-        if str(type(roi)) == "<class 'bokeh.models.annotations.geometry.BoxAnnotation'>":
-            x0, y0, x1, y1 = list(map(int, [roi.left, frame_height-roi.top, roi.right, frame_height-roi.bottom]))
-            rectangle = Polygon([(x0, y0), (x0, y1), (x1, y0), (x1, y1)])
-            
-            if rectangle.contains(centroid):
-                # Additional bounds check
-                if index < len(params.frame_per_roi):
-                    params.frame_per_roi[index] += 1
-            
-        elif str(type(roi)) == "<class 'bokeh.models.renderers.glyph_renderer.GlyphRenderer'>":  
-            # Handle new scatter-based circles
-            try:
-                # Use saved circle data if available
-                roi_id = id(roi)
-                if circle_data and roi_id in circle_data:
-                    data = circle_data[roi_id]
-                    center_x = data['center_x']
-                    center_y = data['center_y']
-                    radius = data['radius']
-                elif 'x' in roi.data_source.data and 'y' in roi.data_source.data:
-                    center_x = roi.data_source.data['x'][0]
-                    center_y = roi.data_source.data['y'][0]
-                    # For scatter circles, size is diameter, so radius = size/2
-                    if 'size' in roi.data_source.data:
-                        radius = roi.data_source.data['size'][0] / 2
-                    else:
-                        radius = 10  # default radius
-                else:
-                    # Fallback to old format
-                    center_x = int(roi.glyph.x)
-                    center_y = int(roi.glyph.y)
-                    radius = int(roi.glyph.radius)
-                    
-                center = Point(center_x, frame_height - center_y)
-                circle = center.buffer(radius)
-            except (AttributeError, KeyError, ValueError, TypeError) as e:
-                print(f"Error processing circle ROI: {e}")
-                continue
-    
-            if circle.contains(centroid):
-                # Additional bounds check
-                if index < len(params.frame_per_roi):
-                    params.frame_per_roi[index] += 1
-
-        elif str(type(roi)) == "<class 'bokeh.models.annotations.geometry.PolyAnnotation'>":
-            fixed_ys = [frame_height-i for i in roi.ys]
-            
-            pts = np.array(list(zip(map(int, roi.xs), map(int, fixed_ys))), np.int32)
                 
     
 def create_roi_mask(rois: list, frame_shape: tuple[int, int]) -> np.ndarray:
@@ -312,12 +252,6 @@ def process_frame(frame: np.ndarray, model: YOLO, frame_num: int, params) -> np.
                 cv.circle(overlay, centroid, 8, COLORS["template_centroid"], 2)
                 cv.circle(overlay, centroid, 4, COLORS["template_centroid"], -1)
 
-        # Check if centroid is in any ROI
-        # print(f"Centroid: {centroid}")
-        if centroid:            
-            get_current_roi(params, params.roi_in_track, frame_height, frame_data["centroid_x"], frame_data["centroid_y"], params.circle_roi_data)
-            # frame_data["roi"] = current_roi
-            # params.frame_per_roi[current_roi] += 1
             
         # Update no detection counter
         if not detection_made:
