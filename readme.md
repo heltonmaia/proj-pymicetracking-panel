@@ -15,7 +15,7 @@ A comprehensive mouse tracking application with Panel interface and YOLO-based c
 - **Synthetic Data**: Synthetic data generation tools
 - **Extra Tools**: Additional utilities and GPU testing
 
-## 📋 Prerequisites
+## Prerequisites
 
 - **Python**: ≥3.11
 - **Package Manager**: [UV](https://docs.astral.sh/uv/) (recommended) or pip
